@@ -176,6 +176,8 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         self.register_epoch_meter('test/loss', 'test', '{:.4f}')
         for key in self.metrics:
             self.register_epoch_meter(f'test/{key}', 'test', '{:.4f}')
+            for i in self.evaluation_horizons:
+                self.register_epoch_meter(f'test/{key}/horizon_{i+1}', 'test', '{:.4f}')
 
     def build_train_dataset(self, cfg: Dict):
         """Build the training dataset.
@@ -376,6 +378,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
 
         metrics_results = {}
         for i in self.evaluation_horizons:
+            # (Count_items, T, N, C)
             pred = returns_all['prediction'][:, i, :, :]
             real = returns_all['target'][:, i, :, :]
 
@@ -387,6 +390,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
                 metric_item = self.metric_forward(metric_func, {'prediction': pred, 'target': real})
                 metric_repr += f', Test {metric_name}: {metric_item.item():.4f}'
                 metrics_results[f'horizon_{i + 1}'][metric_name] = metric_item.item()
+                self.update_epoch_meter(f'test/{metric_name}/horizon_{i+1}', metric_item.item())
             self.logger.info(f'Evaluate best model on test data for horizon {i + 1}{metric_repr}')
 
         metrics_results['overall'] = {}
@@ -442,7 +446,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
             # save metrics_results to self.ckpt_save_dir/test_metrics.json
             with open(os.path.join(self.ckpt_save_dir, 'test_metrics.json'), 'w') as f:
                 json.dump(metrics_results, f, indent=4)
-
+        torch.cuda.empty_cache()
         return returns_all
 
     @master_only

@@ -20,7 +20,7 @@ from .arch.frets import FreTS
 ############################## 热门参数 ##############################
 
 # 数据集和指标配置
-DATA_NAME = 'PEMS04'  # 数据集名称
+DATA_NAME = 'METR-LA'  # 数据集名称
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # 输入序列长度
 OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # 输出序列长度
@@ -34,7 +34,7 @@ MODEL_ARCH = FreTS
 MODEL_PARAM = {
     'seq_len': INPUT_LEN,
     'pred_len': OUTPUT_LEN,
-    "enc_in": 307,
+    "enc_in": 207,
     "feature_in": 3,
 }
 NUM_EPOCHS = 100
@@ -123,7 +123,7 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
                                 'corr': masked_corr,
-                                'spatial_corr': spatial_corr,
+                                'spatial_corr': spatial_corr
                             }) # 指标函数，默认：MAE、MSE、RMSE、MAPE、WAPE
 CFG.METRICS.TARGET = 'MAE' # 目标指标，用于保存最佳检查点。
 CFG.METRICS.BEST = 'min' # 最佳指标，用于保存最佳检查点。'min' 或 'max'。默认值：'min'。如果是 'max'，则指标值越大越好。
@@ -227,5 +227,5 @@ CFG.EVAL = EasyDict()
 # 评估参数
 # 评估时的预测时间范围。默认值为 []。注意：HORIZONS[i] 指的是在 ”第 i 个时间片“ 上进行测试，表示该时间片的损失（Loss）。
 # 这是时空预测中的常见配置。对于长序列预测，建议将 HORIZONS 保持为默认值 []，以避免引发误解。
-CFG.EVAL.HORIZONS = [3, 6, 12]
+CFG.EVAL.HORIZONS = [i for i in range(1, 13)]
 CFG.EVAL.USE_GPU = True # 是否在评估时使用 GPU。默认值：True
