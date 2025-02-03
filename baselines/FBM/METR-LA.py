@@ -14,13 +14,13 @@ from basicts.runners import SimpleTimeSeriesForecastingRunner
 from basicts.scaler import ZScoreScaler
 # 导入数据集配置
 from basicts.utils import get_regular_settings
-from .arch.frets import FreTS
+from .arch.FBM import FBM
 # 导入模型架构
 
 ############################## 热门参数 ##############################
 
 # 数据集和指标配置
-DATA_NAME = 'PEMS04'  # 数据集名称
+DATA_NAME = 'METR-LA'  # 数据集名称
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # 输入序列长度
 OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # 输出序列长度
@@ -30,12 +30,11 @@ RESCALE = regular_settings['RESCALE'] # 是否对数据进行重新缩放
 NULL_VAL = regular_settings['NULL_VAL'] # 数据中的空值
 
 # 模型架构和参数
-MODEL_ARCH = FreTS
+MODEL_ARCH = FBM
 MODEL_PARAM = {
     'seq_len': INPUT_LEN,
     'pred_len': OUTPUT_LEN,
-    "enc_in": 307,
-    "feature_in": 3,
+    "enc_in": 207,
 }
 NUM_EPOCHS = 100
 
@@ -123,7 +122,7 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
                                 'corr': masked_corr,
-                                'spatial_corr': spatial_corr,
+                                'spatial_corr': spatial_corr
                             }) # 指标函数，默认：MAE、MSE、RMSE、MAPE、WAPE
 CFG.METRICS.TARGET = 'MAE' # 目标指标，用于保存最佳检查点。
 CFG.METRICS.BEST = 'min' # 最佳指标，用于保存最佳检查点。'min' 或 'max'。默认值：'min'。如果是 'max'，则指标值越大越好。
