@@ -7,6 +7,7 @@ from easydict import EasyDict
 from basicts.data import TimeSeriesForecastingDataset
 # 导入指标和损失函数
 from basicts.metrics import masked_mae, masked_mape, masked_rmse, masked_corr
+from basicts.metrics.decentral_mae import masked_decentral_mae
 from basicts.metrics.spatial_corr import spatial_corr
 from basicts.metrics.trend_mae import masked_trend_mae
 # 导入执行器类
@@ -124,7 +125,8 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'RMSE': masked_rmse,
                                 'corr': masked_corr,
                                 'spatial_corr': spatial_corr,
-                                'trend_MAE': masked_trend_mae
+                                'trend_MAE': masked_trend_mae,
+                                'decenteral_mae': masked_decentral_mae
                             }) # 指标函数，默认：MAE、MSE、RMSE、MAPE、WAPE
 CFG.METRICS.TARGET = 'MAE' # 目标指标，用于保存最佳检查点。
 CFG.METRICS.BEST = 'min' # 最佳指标，用于保存最佳检查点。'min' 或 'max'。默认值：'min'。如果是 'max'，则指标值越大越好。
