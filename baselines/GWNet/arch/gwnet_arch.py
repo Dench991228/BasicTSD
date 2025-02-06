@@ -162,7 +162,7 @@ class GraphWaveNet(nn.Module):
         Returns:
             torch.Tensor: [B, L, N, 1]
         """
-
+        print(history_data.shape)
         input = history_data.transpose(1, 3).contiguous()
         in_len = input.size(3)
         if in_len < self.receptive_field:

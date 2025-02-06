@@ -88,6 +88,7 @@ class FreTS(nn.Module):
 
     def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int, epoch: int, train: bool, **kwargs):
         # x: [Batch, Input length, num_variate, num_features]
+        history_data = history_data[:, :, :, :self.feature_in]
         B, T, N, F = history_data.shape
         # embedding x: [B, N, T, D]
         print("before tokenize", history_data.shape)

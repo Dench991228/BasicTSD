@@ -4,6 +4,7 @@ import torch
 from easydict import EasyDict
 
 from basicts.metrics.spatial_corr import spatial_corr
+from basicts.metrics.trend_mae import masked_trend_mae
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
 
@@ -98,8 +99,9 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
                                 'corr': masked_corr,
-                                "spatial_corr": spatial_corr
-                            })
+                                "spatial_corr": spatial_corr,
+                                'trend_MAE': masked_trend_mae
+})
 CFG.METRICS.TARGET = 'MAE'
 CFG.METRICS.NULL_VAL = NULL_VAL
 

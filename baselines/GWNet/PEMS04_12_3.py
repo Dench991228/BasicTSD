@@ -8,44 +8,44 @@ from basicts.metrics.trend_mae import masked_trend_mae
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
 
-from basicts.metrics import masked_mae, masked_mape, masked_rmse
+from basicts.metrics import masked_mae, masked_mape, masked_rmse, masked_corr
 from basicts.data import TimeSeriesForecastingDataset
 from basicts.runners import SimpleTimeSeriesForecastingRunner
 from basicts.scaler import ZScoreScaler
 from basicts.utils import get_regular_settings, load_adj
 
-from .arch import STAEformer
+from .arch import GraphWaveNet
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
 DATA_NAME = 'PEMS04'  # Dataset name
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # Length of input sequence
-OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # Length of output sequence
+OUTPUT_LEN = 3  # Length of output sequence
 TRAIN_VAL_TEST_RATIO = regular_settings['TRAIN_VAL_TEST_RATIO']  # Train/Validation/Test split ratios
 NORM_EACH_CHANNEL = regular_settings['NORM_EACH_CHANNEL'] # Whether to normalize each channel of the data
 RESCALE = regular_settings['RESCALE'] # Whether to rescale the data
 NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 # Model architecture and parameters
-MODEL_ARCH = STAEformer
-
+MODEL_ARCH = GraphWaveNet
+adj_mx, _ = load_adj("datasets/" + DATA_NAME +
+                     "/adj_mx.pkl", "doubletransition")
 MODEL_PARAM = {
-    "num_nodes" : 307,
-    "in_steps": INPUT_LEN,
-    "out_steps": OUTPUT_LEN,
-    "steps_per_day": 288, # number of time steps per day
-    "input_dim": 3, # the C in [B, L, N, C]
-    "output_dim": 1,
-    "input_embedding_dim": 24,
-    "tod_embedding_dim": 24,
-    "dow_embedding_dim": 24,
-    "spatial_embedding_dim": 0,
-    "adaptive_embedding_dim": 80,
-    "feed_forward_dim": 256,
-    "num_heads": 4,
-    "num_layers": 3,
-    "dropout": 0.1,
-    "use_mixed_proj": True,
+    "num_nodes": 307,
+    "supports": [torch.tensor(i) for i in adj_mx],
+    "dropout": 0.3,
+    "gcn_bool": True,
+    "addaptadj": True,
+    "aptinit": None,
+    "in_dim": 2,
+    "out_dim": OUTPUT_LEN,
+    "residual_channels": 32,
+    "dilation_channels": 32,
+    "skip_channels": 256,
+    "end_channels": 512,
+    "kernel_size": 2,
+    "blocks": 4,
+    "layers": 2
 }
 NUM_EPOCHS = 100
 
@@ -87,7 +87,7 @@ CFG.MODEL = EasyDict()
 CFG.MODEL.NAME = MODEL_ARCH.__name__
 CFG.MODEL.ARCH = MODEL_ARCH
 CFG.MODEL.PARAM = MODEL_PARAM
-CFG.MODEL.FORWARD_FEATURES = [0, 1, 2]
+CFG.MODEL.FORWARD_FEATURES = [0, 1]
 CFG.MODEL.TARGET_FEATURES = [0]
 
 ############################## Metrics Configuration ##############################
@@ -98,7 +98,8 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAE': masked_mae,
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
-                                'spatial_corr': spatial_corr,
+                                'corr': masked_corr,
+                                "spatial_corr": spatial_corr,
                                 'trend_MAE': masked_trend_mae
                             })
 CFG.METRICS.TARGET = 'MAE'
@@ -117,20 +118,24 @@ CFG.TRAIN.LOSS = masked_mae
 CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"
 CFG.TRAIN.OPTIM.PARAM = {
-    "lr": 0.001,
-    "weight_decay": 0.0003,
+    "lr": 0.002,
+    "weight_decay": 0.0001,
 }
 # Learning rate scheduler settings
 CFG.TRAIN.LR_SCHEDULER = EasyDict()
 CFG.TRAIN.LR_SCHEDULER.TYPE = "MultiStepLR"
 CFG.TRAIN.LR_SCHEDULER.PARAM = {
-    "milestones": [20, 25],
-    "gamma": 0.1
+    "milestones": [1, 50],
+    "gamma": 0.5
 }
 # Train data loader settings
 CFG.TRAIN.DATA = EasyDict()
 CFG.TRAIN.DATA.BATCH_SIZE = 16
 CFG.TRAIN.DATA.SHUFFLE = True
+# Gradient clipping settings
+CFG.TRAIN.CLIP_GRAD_PARAM = {
+    "max_norm": 5.0
+}
 
 ############################## Validation Configuration ##############################
 CFG.VAL = EasyDict()
@@ -149,5 +154,5 @@ CFG.TEST.DATA.BATCH_SIZE = 64
 CFG.EVAL = EasyDict()
 
 # Evaluation parameters
-CFG.EVAL.HORIZONS = [i for i in range(1, 13)] # Prediction horizons for evaluation. Default: []
+CFG.EVAL.HORIZONS = [i for i in range(1, OUTPUT_LEN+1)] # Prediction horizons for evaluation. Default: []
 CFG.EVAL.USE_GPU = True # Whether to use GPU for evaluation. Default: True

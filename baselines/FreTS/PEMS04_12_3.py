@@ -15,7 +15,7 @@ from basicts.runners import SimpleTimeSeriesForecastingRunner
 from basicts.scaler import ZScoreScaler
 # 导入数据集配置
 from basicts.utils import get_regular_settings
-from .arch.FBM import FBM
+from .arch.frets import FreTS
 # 导入模型架构
 
 ############################## 热门参数 ##############################
@@ -24,18 +24,19 @@ from .arch.FBM import FBM
 DATA_NAME = 'PEMS04'  # 数据集名称
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # 输入序列长度
-OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # 输出序列长度
+OUTPUT_LEN = 3  # 输出序列长度
 TRAIN_VAL_TEST_RATIO = regular_settings['TRAIN_VAL_TEST_RATIO']  # 训练/验证/测试集比例
 NORM_EACH_CHANNEL = regular_settings['NORM_EACH_CHANNEL'] # 是否对数据的每个通道独立归一化（例如，独立计算均值和标准差）
 RESCALE = regular_settings['RESCALE'] # 是否对数据进行重新缩放
 NULL_VAL = regular_settings['NULL_VAL'] # 数据中的空值
 
 # 模型架构和参数
-MODEL_ARCH = FBM
+MODEL_ARCH = FreTS
 MODEL_PARAM = {
     'seq_len': INPUT_LEN,
     'pred_len': OUTPUT_LEN,
     "enc_in": 307,
+    "feature_in": 3,
 }
 NUM_EPOCHS = 200
 
@@ -228,5 +229,5 @@ CFG.EVAL = EasyDict()
 # 评估参数
 # 评估时的预测时间范围。默认值为 []。注意：HORIZONS[i] 指的是在 ”第 i 个时间片“ 上进行测试，表示该时间片的损失（Loss）。
 # 这是时空预测中的常见配置。对于长序列预测，建议将 HORIZONS 保持为默认值 []，以避免引发误解。
-CFG.EVAL.HORIZONS = [i for i in range(1, 13)]
+CFG.EVAL.HORIZONS = [i for i in range(1, OUTPUT_LEN+1)]
 CFG.EVAL.USE_GPU = True # 是否在评估时使用 GPU。默认值：True

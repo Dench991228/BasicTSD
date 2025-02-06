@@ -8,6 +8,7 @@ from basicts.data import TimeSeriesForecastingDataset
 # 导入指标和损失函数
 from basicts.metrics import masked_mae, masked_mape, masked_rmse, masked_corr
 from basicts.metrics.spatial_corr import spatial_corr
+from basicts.metrics.trend_mae import masked_trend_mae
 # 导入执行器类
 from basicts.runners import SimpleTimeSeriesForecastingRunner
 # 导入缩放器类
@@ -37,7 +38,7 @@ MODEL_PARAM = {
     "enc_in": 307,
     "feature_in": 3,
 }
-NUM_EPOCHS = 100
+NUM_EPOCHS = 200
 
 ############################## 通用配置 ##############################
 
@@ -124,7 +125,8 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'RMSE': masked_rmse,
                                 'corr': masked_corr,
                                 'spatial_corr': spatial_corr,
-                            }) # 指标函数，默认：MAE、MSE、RMSE、MAPE、WAPE
+                                'trend_MAE': masked_trend_mae
+}) # 指标函数，默认：MAE、MSE、RMSE、MAPE、WAPE
 CFG.METRICS.TARGET = 'MAE' # 目标指标，用于保存最佳检查点。
 CFG.METRICS.BEST = 'min' # 最佳指标，用于保存最佳检查点。'min' 或 'max'。默认值：'min'。如果是 'max'，则指标值越大越好。
 CFG.METRICS.NULL_VAL = NULL_VAL # 指标的空值。默认值：np.nan

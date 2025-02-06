@@ -15,7 +15,7 @@ from basicts.runners import SimpleTimeSeriesForecastingRunner
 from basicts.scaler import ZScoreScaler
 # 导入数据集配置
 from basicts.utils import get_regular_settings
-from .arch.FBM import FBM
+from .arch.frets import FreTS
 # 导入模型架构
 
 ############################## 热门参数 ##############################
@@ -31,11 +31,12 @@ RESCALE = regular_settings['RESCALE'] # 是否对数据进行重新缩放
 NULL_VAL = regular_settings['NULL_VAL'] # 数据中的空值
 
 # 模型架构和参数
-MODEL_ARCH = FBM
+MODEL_ARCH = FreTS
 MODEL_PARAM = {
     'seq_len': INPUT_LEN,
     'pred_len': OUTPUT_LEN,
     "enc_in": 307,
+    "feature_in": 1,
 }
 NUM_EPOCHS = 200
 
@@ -125,7 +126,7 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'corr': masked_corr,
                                 'spatial_corr': spatial_corr,
                                 'trend_MAE': masked_trend_mae
-                            }) # 指标函数，默认：MAE、MSE、RMSE、MAPE、WAPE
+}) # 指标函数，默认：MAE、MSE、RMSE、MAPE、WAPE
 CFG.METRICS.TARGET = 'MAE' # 目标指标，用于保存最佳检查点。
 CFG.METRICS.BEST = 'min' # 最佳指标，用于保存最佳检查点。'min' 或 'max'。默认值：'min'。如果是 'max'，则指标值越大越好。
 CFG.METRICS.NULL_VAL = NULL_VAL # 指标的空值。默认值：np.nan

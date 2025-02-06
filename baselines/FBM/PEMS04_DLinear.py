@@ -15,6 +15,7 @@ from basicts.runners import SimpleTimeSeriesForecastingRunner
 from basicts.scaler import ZScoreScaler
 # 导入数据集配置
 from basicts.utils import get_regular_settings
+from .arch.FBM_DLinear import FBM_DLinear
 from .arch.FBM import FBM
 # 导入模型架构
 
@@ -31,11 +32,12 @@ RESCALE = regular_settings['RESCALE'] # 是否对数据进行重新缩放
 NULL_VAL = regular_settings['NULL_VAL'] # 数据中的空值
 
 # 模型架构和参数
-MODEL_ARCH = FBM
+MODEL_ARCH = FBM_DLinear
 MODEL_PARAM = {
     'seq_len': INPUT_LEN,
     'pred_len': OUTPUT_LEN,
     "enc_in": 307,
+    'decomposition': True
 }
 NUM_EPOCHS = 200
 

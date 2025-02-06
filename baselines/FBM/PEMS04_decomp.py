@@ -36,6 +36,7 @@ MODEL_PARAM = {
     'seq_len': INPUT_LEN,
     'pred_len': OUTPUT_LEN,
     "enc_in": 307,
+    'decomposition': True
 }
 NUM_EPOCHS = 200
 
