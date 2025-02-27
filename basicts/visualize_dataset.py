@@ -35,3 +35,26 @@ def window_similarity_visualize(result_file_dir: str, window_index: int, sensor_
     x = np.arange(inputs.shape[0])
 
     plot_line(x=x, ys=[referred_input_mse, referred_output_mse], y_names=["input_window_distance", "output_window_distance"], y_axis_name="MSE Distance", w=window_index, title=f"Similarity of input and output windows referring to window {window_index} of sensor {sensor_id}")
+
+def st_indistinguishability_visualize(result_file_dir: str):
+    # (I, Timestamps, Nodes, Feature)
+    inputs, targets, predictions = read_result_file(result_file_dir)
+    # 展示每一个时间步的时空不可分辨性指数
+    # 先计算每一个时间步，任意两个输入数据之间的相似性
+    # (I, Nodes, Timestamps)
+    inputs = np.transpose(inputs[:, :, :, 0], (0, 2, 1))
+    targets = np.transpose(targets[:, :, :, 0], (0, 2, 1))
+
+    input_mse = np.mean((np.expand_dims(inputs, -2) - np.expand_dims(inputs, 1))**2, axis=-1)
+    print(input_mse.shape)
+    diag = np.eye(inputs.shape[1])
+    print(diag.shape)
+    input_mse += np.expand_dims(diag, axis=0)
+    target_mse = np.mean((np.expand_dims(targets, -2) - np.expand_dims(targets, 1))**2, axis=-1)
+    # (I, Nodes, Nodes) -> (I)
+    relative_stid = np.abs((input_mse - target_mse) / input_mse)
+    relative_stid = np.nansum(relative_stid, axis=(-1, -2))
+    x = np.arange(inputs.shape[0])
+    plot_line(x=x, ys=[relative_stid], y_names=["relative spatial temporal indistinguishability"],
+              y_axis_name="MSE Distance",
+              title=f"Variation of Spatial Temporal Indistinguishability")

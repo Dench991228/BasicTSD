@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 
 from basicts.utils.result import read_repr_file
@@ -21,5 +23,6 @@ def visualize_repr(repr_result_file, window_id: int, sensor_id: int):
     cosine_distances = 1 - np.matmul(referred_sensor_features_normalized, sensor_features_normalized.T)[0]
     x = np.arange(reprs.shape[0])
     plot_line(title=f"Feature Similarity Referring to window {window_id} of sensor {sensor_id}",
-              x=x, ys=[cosine_distances], y_names=["feature similarity"], y_axis_name="cosine_distance", w=window_id)
+              x=x, ys=[cosine_distances], y_names=["feature similarity"], y_axis_name="cosine_distance", w=window_id,
+              base_folder=os.path.dirname(repr_result_file))
 

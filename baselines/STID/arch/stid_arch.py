@@ -1,3 +1,5 @@
+from typing import Dict
+
 import torch
 from torch import nn
 
@@ -62,7 +64,9 @@ class STID(nn.Module):
         self.regression_layer = nn.Conv2d(
             in_channels=self.hidden_dim, out_channels=self.output_len, kernel_size=(1, 1), bias=True)
 
-    def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int, epoch: int, train: bool, **kwargs) -> torch.Tensor:
+    def forward(self, history_data: torch.Tensor, future_data: torch.Tensor,
+                batch_seen: int, epoch: int, train: bool,
+                return_repr: bool, **kwargs) -> torch.Tensor|Dict:
         """Feed forward of STID.
 
         Args:
@@ -112,8 +116,15 @@ class STID(nn.Module):
 
         # encoding
         hidden = self.encoder(hidden)
-
+        print(hidden.shape)
+        repr = hidden[:, :, :, 0].permute(0, 2, 1).contiguous()
         # regression
+        # (B, Feature, N, 1) -> (B, Feature, N, out_len)
         prediction = self.regression_layer(hidden)
-
-        return prediction
+        if not return_repr:
+            return prediction
+        else:
+            return {
+                "prediction": prediction,
+                "representation": repr
+            }

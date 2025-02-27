@@ -134,7 +134,7 @@ class backbone_new_NLinear(nn.Module):
         self.cos = nn.Parameter(cos, requires_grad=False)
         self.sin = nn.Parameter(sin, requires_grad=False)
 
-    def forward(self, z):  # z: [bs x nvars x seq_len]
+    def forward(self, z, return_repr):  # z: [bs x nvars x seq_len]
         # norm
         if self.revin:
             z = z.permute(0, 2, 1)
@@ -154,8 +154,10 @@ class backbone_new_NLinear(nn.Module):
             z = z.permute(0, 2, 1)
             z = self.revin_layer(z, 'denorm')
             z = z.permute(0, 2, 1)
-
-        return z
+        if not return_repr:
+            return z
+        else:
+            return z,
 
 
 class Flatten_Head_NLinear(nn.Module):
@@ -185,7 +187,7 @@ class Flatten_Head_NLinear(nn.Module):
                 nn.Linear(720 * 2, target_window)
             )
 
-    def forward(self, x):  # x: [bs x nvars x d_model x patch_num]
+    def forward(self, x, return_repr: bool):  # x: [bs x nvars x d_model x patch_num]
         if self.individual:
             x_out = []
             for i in range(self.n_vars):
@@ -197,7 +199,10 @@ class Flatten_Head_NLinear(nn.Module):
         else:
             x = self.flatten(x)
             x = self.linear(x)
-        return x
+        if not return_repr:
+            return x
+        else:
+            return x
 
 class Flatten_Head(nn.Module):
     def __init__(self, individual, n_vars, nf, target_window, head_dropout=0):

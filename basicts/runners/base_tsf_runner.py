@@ -429,12 +429,12 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
             prediction.append(forward_return['prediction'])
             target.append(forward_return['target'])
             inputs.append(forward_return['inputs'])
-            reprs.append(forward_return['representation'].detach().cpu())
+            if "representation" in forward_return:
+                reprs.append(forward_return['representation'].detach().cpu())
 
         prediction = torch.cat(prediction, dim=0)
         target = torch.cat(target, dim=0)
         inputs = torch.cat(inputs, dim=0)
-        reprs = torch.cat(reprs, dim=0)
         returns_all = {'prediction': prediction, 'target': target, 'inputs': inputs}
         metrics_results = self.compute_evaluation_metrics(returns_all)
 
@@ -449,9 +449,11 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
             with open(os.path.join(self.ckpt_save_dir, 'test_metrics.json'), 'w') as f:
                 json.dump(metrics_results, f, indent=4)
         # note 保存输出结果
-        np.savez(os.path.join(self.ckpt_save_dir, 'test_repr.npz'), **{
-            "reprs": reprs
-        })
+        if len(reprs) > 0:
+            reprs = torch.cat(reprs, dim=0)
+            np.savez(os.path.join(self.ckpt_save_dir, 'test_repr.npz'), **{
+                "reprs": reprs
+            })
         torch.cuda.empty_cache()
         return returns_all
 
