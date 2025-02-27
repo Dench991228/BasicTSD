@@ -38,13 +38,17 @@ class series_decomp(nn.Module):
         return res, moving_mean
 
 class FBM(nn.Module):
-    def __init__(self, seq_len, pred_len, enc_in, decomposition: bool = False, kernel_size: int = 3, verbose: bool = False):
+    def __init__(self, seq_len, pred_len, enc_in,
+                 decomposition: bool = False,
+                 kernel_size: int = 3,
+                 verbose: bool = False,
+                 revin: bool = True):
         super().__init__()
         # load parameters
         c_in = enc_in
         context_window = seq_len
         target_window = pred_len
-        revin = True
+        revin = revin
         affine = True
         subtract_last = False
         individual = False

@@ -153,7 +153,13 @@ class GraphWaveNet(nn.Module):
 
         self.receptive_field = receptive_field
 
-    def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int, epoch: int, train: bool, **kwargs) -> torch.Tensor:
+    def forward(self, history_data: torch.Tensor,
+                future_data: torch.Tensor,
+                batch_seen: int,
+                epoch: int,
+                train: bool,
+                return_repr: bool = False,
+                **kwargs) -> torch.Tensor:
         """Feedforward function of Graph WaveNet.
 
         Args:
@@ -162,7 +168,6 @@ class GraphWaveNet(nn.Module):
         Returns:
             torch.Tensor: [B, L, N, 1]
         """
-        print(history_data.shape)
         input = history_data.transpose(1, 3).contiguous()
         in_len = input.size(3)
         if in_len < self.receptive_field:
@@ -224,8 +229,16 @@ class GraphWaveNet(nn.Module):
             x = x + residual[:, :, :, -x.size(3):]
 
             x = self.bn[i](x)
-
+        # (B, dim, nodes, features) -> (B, nodes, dim)
+        repr = skip[:, :, :, 0].permute((0, 2, 1)).contiguous()
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
+        # (B, dim, nodes, T) -> (B, nodes, dim)
         x = self.end_conv_2(x)
-        return x
+        if not return_repr:
+            return x
+        else:
+            return {
+                "prediction": x,
+                "representation": repr,
+            }

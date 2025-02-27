@@ -51,6 +51,7 @@ class backbone_new_Linear(nn.Module):
             z = z.permute(0, 2, 1)
 
         norm = z.size()[-1]
+        # (bs * nvars * seq_len) -> (bs * nvars * components)
         frequency = rfft(z, axis=-1)
         X_oneside = frequency / (norm) * 2
 

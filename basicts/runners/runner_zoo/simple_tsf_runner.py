@@ -99,7 +99,7 @@ class SimpleTimeSeriesForecastingRunner(BaseTimeSeriesForecastingRunner):
 
         # Forward pass through the model
         model_return = self.model(history_data=history_data, future_data=future_data_4_dec,
-                                  batch_seen=iter_num, epoch=epoch, train=train)
+                                  batch_seen=iter_num, epoch=epoch, train=train, return_repr=True)
 
         # Parse model return
         if isinstance(model_return, torch.Tensor):
@@ -108,7 +108,6 @@ class SimpleTimeSeriesForecastingRunner(BaseTimeSeriesForecastingRunner):
             model_return['inputs'] = self.select_target_features(history_data)
         if 'target' not in model_return:
             model_return['target'] = self.select_target_features(future_data)
-
         # Ensure the output shape is correct
         assert list(model_return['prediction'].shape)[:3] == [batch_size, length, num_nodes], \
             "The shape of the output is incorrect. Ensure it matches [B, L, N, C]."

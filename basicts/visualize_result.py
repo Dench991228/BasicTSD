@@ -5,46 +5,65 @@ import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from utils.visualize import plot_line
+from utils.visualize import plot_line, plot_mesh
 from utils.result import read_result_file
 import torch
 
-def visualize_amplitude(file_dir: str):
+def visualize_amplitude(file_dir: str, sensor_id: int = 0):
     # note 先读取三个文件，转换为torch格式
     inputs, target, prediction = read_result_file(file_dir)
     time_steps, window_length, count_variates, count_features = inputs.shape
     frequencies = time_steps // 2 + 1
     print("Changing Features into Fourier Representation")
     amplitude = []
-    for s in tqdm(range(count_variates)):
-        fft_repr = np.fft.rfft(inputs[:, 0, s, 0], norm="ortho")
-        amplitude.append(fft_repr.real**2+fft_repr.imag**2)
-        print(amplitude[-1])
+    top5percent = int(frequencies * 0.05)
+    inputs[:, 0, sensor_id, 0] -= np.mean(inputs[:, 0, sensor_id, 0])
+    fft_repr = np.fft.rfft(inputs[:, 0, sensor_id, 0], norm="ortho")
+    amplitude.append(np.sqrt(fft_repr.real**2+fft_repr.imag**2))
+    print(amplitude[-1])
+    sorted_amplitude = np.argsort(amplitude[-1])
+    print(sorted_amplitude[-top5percent:])
     # 生成随机数据模拟振幅
     # 数据形状为 (时间步, 频率)
     amplitude = np.stack(amplitude, axis=0)
     print(amplitude.shape)
-
-    # 创建时间步和频率的网格
-    variates = np.arange(count_variates)
-    freq = np.arange(frequencies)
-
-    # 绘制频谱图
-    plt.figure(figsize=(24, 6))
-    plt.pcolormesh(variates, freq, amplitude.T, shading='auto', cmap='viridis')
-
-    # 添加颜色条
-    plt.colorbar(label='Amplitude')
-
-    # 设置坐标轴标签
-    plt.xlabel('Variates')
-    plt.ylabel('Frequency')
-    plt.tight_layout()
     # 显示图形
     fig_dir = os.path.join(os.path.dirname(file_dir), "visualize_result")
-    os.makedirs(fig_dir, exist_ok=True)
-    fig_name = os.path.join(fig_dir, "amplitude.png")
-    plt.savefig(fig_name)
+    plot_line(base_folder=fig_dir,
+              title="Amplitude of last sensor",
+              x_axis_name="k",
+              x=[i for i in range(frequencies)],
+              ys=[amplitude[-1]],
+              y_names=["amplitude of last sensor"],
+              y_axis_name="amplitude",)
+
+def visualize_amplitude_change(file_dir: str, sensor_id: int = 0):
+    """
+    展现某个节点频率分量随时间变化
+    :param file_dir: 目标的预测文件
+    :param sensor_id: 目标的sensor_id
+    """
+    inputs, target, prediction = read_result_file(file_dir)
+    time_steps, window_length, count_variates, count_features = inputs.shape
+    frequencies = window_length // 2 + 1
+    print("Changing Features into Fourier Representation")
+    # 先弄输入特征
+    # (count_timesteps, window_length)
+    amplitude_repr = []
+    for arr in [target, prediction]:
+        inputs = arr[:, :, sensor_id, 0]
+        amplitude_inputs = []
+        for i in range(time_steps):
+            inputs[i] -= np.mean(inputs[i])
+            fft_repr = np.fft.rfft(inputs[i], norm="ortho")
+            amplitude_inputs.append(np.sqrt(fft_repr.real**2+fft_repr.imag**2))
+        amplitude_inputs = np.stack(amplitude_inputs, axis=0)
+        amplitude_repr.append(amplitude_inputs)
+    amplitude_repr.append(np.abs(amplitude_repr[-1] - amplitude_repr[-2]))
+
+    for arr, name in zip(amplitude_repr, ["label", "pred", "amplitude error"]):
+        fig_dir = os.path.join(os.path.dirname(file_dir), "visualize_result")
+        plot_mesh(fig_dir, f"Distribution of {name}s' frequency components through time", arr, 150)
 
 def visualize_prediction(file_dir: str,
                          sensor_id: int = 0,

@@ -11,3 +11,12 @@ def read_result_file(filename):
     prediction = result_obj['prediction']
     inputs = result_obj['inputs']
     return inputs, target, prediction
+
+def read_repr_file(filename):
+    """
+    读取预测文件，输出三个张量inputs, target, prediction，形状都是[I, N, feature]
+    """
+    # note 先读取三个文件
+    result_obj = np.load(filename)
+    repr = result_obj['reprs']
+    return repr
