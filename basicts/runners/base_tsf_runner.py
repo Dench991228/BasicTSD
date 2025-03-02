@@ -347,7 +347,12 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
             forward_return['target'] = forward_return['target'][:, :cl_length, :, :]
         loss = self.metric_forward(self.loss, forward_return)
         self.update_epoch_meter('train/loss', loss.item())
-
+        # note 在这里增加对比损失函数的事情
+        if "other_losses" in forward_return:
+            for loss_item in forward_return['other_losses']:
+                loss += loss_item['loss'] * loss_item['weight']
+                ln = loss_item['loss_name']
+                # self.update_epoch_meter(f'train/{ln}', loss_item['loss'].item())
         for metric_name, metric_func in self.metrics.items():
             metric_item = self.metric_forward(metric_func, forward_return)
             self.update_epoch_meter(f'train/{metric_name}', metric_item.item())

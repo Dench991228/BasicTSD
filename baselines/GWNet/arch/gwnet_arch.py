@@ -1,6 +1,11 @@
+from typing import Dict
+
 import torch
 from torch import nn
 import torch.nn.functional as F
+
+from baselines.SSL.arch.PatchPerm import PatchPermAugmentation
+from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss
 
 
 class nconv(nn.Module):
@@ -63,10 +68,12 @@ class GraphWaveNet(nn.Module):
     """
 
     def __init__(self, num_nodes, dropout=0.3, supports=None,
-                    gcn_bool=True, addaptadj=True, aptinit=None,
-                    in_dim=2, out_dim=12, residual_channels=32,
-                    dilation_channels=32, skip_channels=256, end_channels=512,
-                    kernel_size=2, blocks=4, layers=2):
+                 gcn_bool=True, addaptadj=True, aptinit=None,
+                 in_dim=2, out_dim=12, residual_channels=32,
+                 dilation_channels=32, skip_channels=256, end_channels=512,
+                 kernel_size=2, blocks=4, layers=2,
+                 ssl_name: str = None, ssl_loss_weight: float = None, **kwargs
+                 ):
         super(GraphWaveNet, self).__init__()
         self.dropout = dropout
         self.blocks = blocks
@@ -152,14 +159,23 @@ class GraphWaveNet(nn.Module):
                                     bias=True)
 
         self.receptive_field = receptive_field
+        # note 设置和自监督损失有关的内容
+        self.ssl_metric_name = ssl_name
+        self.ssl_loss_weight = ssl_loss_weight
+        if ssl_name is not None:
+            if ssl_name == "softclt":
+                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"])
+                self.ppa_aug = PatchPermAugmentation()
+            else:
+                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"])
 
-    def forward(self, history_data: torch.Tensor,
+    def _forward(self, history_data: torch.Tensor,
                 future_data: torch.Tensor,
                 batch_seen: int,
                 epoch: int,
                 train: bool,
                 return_repr: bool = False,
-                **kwargs) -> torch.Tensor:
+                **kwargs) -> torch.Tensor|Dict:
         """Feedforward function of Graph WaveNet.
 
         Args:
@@ -229,7 +245,7 @@ class GraphWaveNet(nn.Module):
             x = x + residual[:, :, :, -x.size(3):]
 
             x = self.bn[i](x)
-        # (B, dim, nodes, features) -> (B, nodes, dim)
+        # (B, dim, nodes, T) -> (B, nodes, dim)
         repr = skip[:, :, :, 0].permute((0, 2, 1)).contiguous()
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
@@ -242,3 +258,36 @@ class GraphWaveNet(nn.Module):
                 "prediction": x,
                 "representation": repr,
             }
+
+    def forward(self, history_data: torch.Tensor,
+                future_data: torch.Tensor,
+                batch_seen: int,
+                epoch: int,
+                train: bool,
+                return_repr: bool = False,
+                **kwargs) -> torch.Tensor:
+        # note 如果没有对比损失的话
+        # prediction: 预测结果，repr (B, node, dim)
+        original_forward_output =  self._forward(history_data, future_data, batch_seen, epoch, train, return_repr)
+        # note 考虑和对比损失有关的内容
+        if self.ssl_metric_name is not None:
+            # 先数据增强, 先交换，再增加高斯噪声
+            augmented_data = self.ppa_aug(history_data)
+            rand_noise = torch.randn_like(augmented_data).cuda()*0.01
+            augmented_data += rand_noise
+            # 之后再收集对比学习部分的损失
+            augmented_forward_output = self._forward(augmented_data, future_data, batch_seen, epoch, train, return_repr)
+            print(original_forward_output["representation"].shape, augmented_forward_output["representation"].shape)
+            ssl_loss = self.ssl_module(original_forward_output["representation"],
+                            augmented_forward_output["representation"],
+                            history_data[:, :, :, 0],
+                            augmented_data[:, :, :, 0]
+                            )
+            original_forward_output['other_losses'] = [
+                {
+                    "weight": self.ssl_loss_weight,
+                    "loss": ssl_loss,
+                    "loss_name": self.ssl_metric_name
+                }
+            ]
+        return original_forward_output
