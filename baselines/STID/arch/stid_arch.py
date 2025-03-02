@@ -64,6 +64,8 @@ class STID(nn.Module):
         self.regression_layer = nn.Conv2d(
             in_channels=self.hidden_dim, out_channels=self.output_len, kernel_size=(1, 1), bias=True)
 
+        # note 这里面增加和对比学习有关的内容
+
     def forward(self, history_data: torch.Tensor, future_data: torch.Tensor,
                 batch_seen: int, epoch: int, train: bool,
                 return_repr: bool, **kwargs) -> torch.Tensor|Dict:

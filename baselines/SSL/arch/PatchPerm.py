@@ -43,5 +43,4 @@ class PatchPermAugmentation(nn.Module):
         """
         series = input[:, :, :, 0]
         remainder = input[:, :, :, 1:]
-
         return torch.cat([process_sequence(series, self.ps, self.sr).unsqueeze(-1), remainder], dim=-1)
