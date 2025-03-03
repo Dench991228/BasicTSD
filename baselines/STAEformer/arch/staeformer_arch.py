@@ -1,3 +1,5 @@
+from typing import Dict
+
 import torch.nn as nn
 import torch
 
@@ -133,6 +135,7 @@ class STAEformer(nn.Module):
         num_layers=3,
         dropout=0.1,
         use_mixed_proj=True,
+        **kwargs
     ):
         super().__init__()
 
@@ -195,7 +198,8 @@ class STAEformer(nn.Module):
             ]
         )
 
-    def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int, epoch: int, train: bool, **kwargs):
+    def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int,
+                epoch: int, train: bool, return_repr: bool = False, **kwargs) -> torch.Tensor|Dict:
         # x: (batch_size, in_steps, num_nodes, input_dim+tod+dow=3)
         x = history_data
         batch_size = x.shape[0]
@@ -235,7 +239,11 @@ class STAEformer(nn.Module):
         for attn in self.attn_layers_s:
             x = attn(x, dim=2)
         # (batch_size, in_steps, num_nodes, model_dim)
-
+        # note 这里才是需要输出的地方
+        # (batch_size, num_nodes, in_steps, model_dim)
+        repr = x.transpose(1, 2)
+        repr = repr.reshape(batch_size, -1, self.model_dim * self.in_steps)
+        print(repr.shape)
         if self.use_mixed_proj:
             out = x.transpose(1, 2)  # (batch_size, num_nodes, in_steps, model_dim)
             out = out.reshape(
@@ -253,5 +261,10 @@ class STAEformer(nn.Module):
             out = self.output_proj(
                 out.transpose(1, 3)
             )  # (batch_size, out_steps, num_nodes, output_dim)
-
-        return out
+        if not return_repr:
+            return out
+        else:
+            return {
+                "prediction": out,
+                "representation": repr,
+            }

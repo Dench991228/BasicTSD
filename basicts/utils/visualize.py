@@ -10,7 +10,7 @@ def plot_line( title: str,
               base_folder: str = None,
               y_max = None, y_min = None,
               x_axis_name: str = "time steps", y_axis_name: str = "loss",
-              w: int = None
+              w: int = None, no_line: bool = False,
               ):
     """
     绘制折线图的函数
@@ -30,7 +30,11 @@ def plot_line( title: str,
 
     # 挨个绘制折线
     for y, y_name in zip(ys, y_names):
-        plt.plot(x, y, label=y_name, marker='.', linestyle='-', markersize=1)
+        if not no_line:
+            plt.plot(x, y, label=y_name, marker='.', linestyle='-', markersize=1)
+        else:
+            plt.plot(x, y, label=y_name, marker='.', linestyle='none', markersize=1)
+
 
     # 添加标题
     plt.title(title)

@@ -46,7 +46,8 @@ MODEL_PARAM = {
     "ssl_loss_weight": 0.05,
     "alpha": 1.0,
     "tau": 1.0,
-    "similarity_metric": "mse"
+    "hard": True,
+    "similarity_metric": "mse",
 }
 NUM_EPOCHS = 100
 

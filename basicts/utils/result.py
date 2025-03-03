@@ -20,3 +20,39 @@ def read_repr_file(filename):
     result_obj = np.load(filename)
     repr = result_obj['reprs']
     return repr
+
+def result_file_group_by_node(filename: str):
+    """
+    读取预测文件，输出一个张量，形状为(node, I, C)，其中node为节点数目，I为测试集有多少时间步，C为变量数目
+    """
+    # note 整理mae随时间变化
+    # 形状为(I, T, N, C)
+    inputs, target, prediction = read_result_file(filename)
+    # (I, T, N, C)
+    error = np.abs(target-prediction)
+    # (I, T, N, C) -> (I, N, C)
+    mae = np.mean(error, axis=1)
+    # (I, N, C) -> (N, I, C)
+    mae = np.transpose(mae, (1, 0, 2))
+    # note 整理输入值随时间变化
+    return mae, inputs[:, -1, :, :].transpose((1, 0, 2))
+
+def result_file_group_by_node_and_cycle(filename: str, cycle: int):
+    """
+    读取预测的文件，输出一个张量，形状为(node, cycle, C)，cycle是循环一圈的时间步
+    """
+    # (N, I, C)
+    # note 先规整一下mae的循环
+    mae_by_node, inputs = result_file_group_by_node(filename)
+    sum_cycles = mae_by_node.shape[1] // cycle
+    remaining_timestamps = sum_cycles * cycle
+    mae_by_node = mae_by_node[:, :remaining_timestamps]
+    # (N, count_cycles, cycle, C) -> (N, cycle, C)
+    mae_by_node = mae_by_node.reshape(mae_by_node.shape[0], sum_cycles, cycle, mae_by_node.shape[-1])
+    new_shape = mae_by_node.shape
+    mae_by_node = np.mean(mae_by_node, axis=1)
+    # note 再规整一下原始数据的季节循环
+    inputs = inputs[:, :remaining_timestamps]
+    inputs = inputs.reshape(new_shape)
+    inputs = np.mean(inputs, axis=1)
+    return mae_by_node, inputs

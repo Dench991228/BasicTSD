@@ -43,7 +43,7 @@ MODEL_PARAM = {
     "time_of_day_size": 288,
     "day_of_week_size": 7,
     "ssl_name": "softclt",
-    "ssl_loss_weight": 0.05,
+    "ssl_loss_weight": 0.5,
     "alpha": 1.0,
     "tau": 1.0,
     "similarity_metric": "mse"

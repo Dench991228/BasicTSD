@@ -164,10 +164,12 @@ class GraphWaveNet(nn.Module):
         self.ssl_loss_weight = ssl_loss_weight
         if ssl_name is not None:
             if ssl_name == "softclt":
-                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"])
+                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
+                                               hard=kwargs["hard"],)
                 self.ppa_aug = PatchPermAugmentation()
             else:
-                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"])
+                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
+                                               hard=kwargs["hard"])
 
     def _forward(self, history_data: torch.Tensor,
                 future_data: torch.Tensor,

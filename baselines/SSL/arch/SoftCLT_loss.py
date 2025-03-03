@@ -4,17 +4,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SoftCLT_Loss(nn.Module):
-    def __init__(self, similarity_metric: str, alpha: float, tau: float):
+    def __init__(self, similarity_metric: str, alpha: float, tau: float, hard: bool = False, **kwargs):
         """
         SoftCLT损失，来自于(24-ICLR) Soft Contrastive Learning for Time Series，这个损失的意义是让编码出来的时间序列表示之间的距离能够反映定义在数据空间的DTW距离
         :param similarity_metric: {mse, correntropy, correlation, cosine}
         :param alpha: 两个不同时间序列之间权重的上限
-        :param tau: 用来调控软正例权重的参数，控制尖锐成都
+        :param tau: 用来调控软正例权重的参数，控制尖锐程度
         """
         super(SoftCLT_Loss, self).__init__()
         self.similarity_metric_name = similarity_metric
         self.alpha = alpha
         self.tau = tau
+        self.hard = hard
 
 
     def forward(self,
@@ -61,23 +62,32 @@ class SoftCLT_Loss(nn.Module):
         # (B*N, T) -> (2*B*N, T)
         original_series = original_series.reshape(-1, T)
         augmented_series = augmented_series.reshape(-1, T)
-        all_series = torch.cat((original_series, augmented_series), dim=0)
         # (2*B*N, 2*B*N)
-        pairwise_dist = self.pairwise_dist_mse(all_series)
-        soft_label = 2 * self.alpha*F.sigmoid(-self.tau * pairwise_dist)
-        # 接下来去掉对角线 (2*B*N, 2*B*N-1)
-        soft_label_no_diag = torch.tril(soft_label, diagonal=-1)[:, :-1]
-        soft_label_no_diag += torch.triu(soft_label, diagonal=-1)[:, 1:]
+        if not self.hard: # 如果是软对比学习，需要增加对原始数据的计算
+            # (B, B)
+            pairwise_dist = self.pairwise_dist_mse(original_series).repeat((2, 2))
+            soft_label = 2 * self.alpha*F.sigmoid(-self.tau * pairwise_dist)
+            # 接下来去掉对角线 (2*B*N, 2*B*N-1)
+            soft_label_no_diag = torch.tril(soft_label, diagonal=-1)[:, :-1]
+            soft_label_no_diag += torch.triu(soft_label, diagonal=-1)[:, 1:]
 
-        # note 得到最终的对比损失
-        loss = logits * soft_label_no_diag
-        loss = torch.mean(loss)
-        print(torch.mean(soft_label), loss)
+            # note 得到最终的对比损失
+            loss = logits * soft_label_no_diag
+            loss = torch.mean(loss)
+            print(torch.mean(soft_label), loss)
+        else: # 如果是硬对比学习，就和自己对比即可
+            # note 这一部分是原始样本和增强样本的对比
+            i = torch.arange(batch_size, device=original_series.device)
+            loss1 = torch.mean(logits[i, batch_size + i - 1])
+            loss2 = torch.mean(logits[batch_size + i, i])
+            loss = (loss1 + loss2) / 2
+            print(loss)
         return loss
 
     def pairwise_dist_mse(self, all_features: torch.Tensor):
         """
         计算两两之间的软标签
+        note 直接依靠原始序列进行计算，计算完了之后得到(B, B)的相似度矩阵，之后再进行
         :param all_features: 包含Batch个样本，其中每一个样本有d维的张量，计算两两之间的相似性
         :return 形状为(B, B)的矩阵，代表了两两之间的mse
         """
