@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 
 from baselines.SSL.arch.PatchPerm import PatchPermAugmentation
-from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss
+from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub
 from baselines.STAEformer.arch.staeformer_arch import STAEformer
 from baselines.STID.arch.stid_arch import STID
 
@@ -18,6 +18,10 @@ class STID_SSL(STID):
         if ssl_name is not None:
             if ssl_name == "softclt":
                 self.ssl_module = SoftCLT_Loss(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "softclt_sub":
+                print("softclt_sub")
+                self.ssl_module = SoftCLT_Loss_Sub(**kwargs)
                 self.ppa_aug = PatchPermAugmentation()
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],

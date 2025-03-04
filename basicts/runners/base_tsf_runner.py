@@ -351,6 +351,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         if "other_losses" in forward_return:
             for loss_item in forward_return['other_losses']:
                 loss += loss_item['loss'] * loss_item['weight']
+                print(loss, loss_item['weight'] * loss_item['loss'])
                 ln = loss_item['loss_name']
                 # self.update_epoch_meter(f'train/{ln}', loss_item['loss'].item())
         for metric_name, metric_func in self.metrics.items():

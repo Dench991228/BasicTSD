@@ -98,3 +98,20 @@ class SoftCLT_Loss(nn.Module):
         # (B, 1) + (1, B) - 2*(B, B)
         mse_matrix = (sum_sq.unsqueeze(-1) + sum_sq.unsqueeze(0) - 2 * dot_product)
         return mse_matrix
+
+class SoftCLT_Loss_Sub(SoftCLT_Loss):
+    def __init__(self, similarity_metric: str, alpha: float, tau: float, ssl_input_dim: int, hard: bool = False, **kwargs):
+        super().__init__(similarity_metric, alpha, tau, hard, **kwargs)
+        # note 增加一个用来映射的部分
+        self.mapper = nn.Linear(ssl_input_dim, ssl_input_dim // 2)
+
+    def forward(self,
+                original_feature: torch.Tensor,
+                augmented_feature: torch.Tensor,
+                original_series: torch.Tensor,
+                augmented_series: torch.Tensor
+                ) -> torch.Tensor:
+        original_feature = self.mapper(original_feature)
+        augmented_feature = self.mapper(augmented_feature)
+        print(original_feature.shape, augmented_feature.shape)
+        return SoftCLT_Loss.forward(self, original_feature, augmented_feature, original_series, augmented_series)
