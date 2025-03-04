@@ -71,6 +71,10 @@ class STAEformer_SSL(STAEformer):
             if ssl_name == "softclt":
                 self.ssl_module = SoftCLT_Loss(**kwargs)
                 self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "softclt_sub":
+                print("softclt_sub")
+                self.ssl_module = SoftCLT_Loss_Sub(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
                                                hard=kwargs["hard"])
