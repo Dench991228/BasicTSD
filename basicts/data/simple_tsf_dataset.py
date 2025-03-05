@@ -88,11 +88,15 @@ class TimeSeriesForecastingDataset(BaseDataset):
             data = np.memmap(self.data_file_path, dtype='float32', mode='r', shape=tuple(self.description['shape']))
         except (FileNotFoundError, ValueError) as e:
             raise ValueError(f'Error loading data file: {self.data_file_path}') from e
-
-        total_len = len(data)
-        valid_len = int(total_len * self.train_val_test_ratio[1])
-        test_len = int(total_len * self.train_val_test_ratio[2])
-        train_len = total_len - valid_len - test_len
+        if isinstance(self.train_val_test_ratio[0], float):
+            total_len = len(data)
+            valid_len = int(total_len * self.train_val_test_ratio[1])
+            test_len = int(total_len * self.train_val_test_ratio[2])
+            train_len = total_len - valid_len - test_len
+        else:
+            train_len = self.train_val_test_ratio[0]
+            valid_len = self.train_val_test_ratio[1]
+            test_len = self.train_val_test_ratio[2]
 
         # Automatically configure the overlap parameter
         minimal_len = self.input_len + self.output_len
@@ -106,17 +110,30 @@ class TimeSeriesForecastingDataset(BaseDataset):
                 self.logger.info(f'{dataset} dataset is too short, enabling overlap. See details in {file_name} at line {line_number}.')
             else:
                 print(f'{dataset} dataset is too short, enabling overlap. See details in {file_name} at line {line_number}.')
+        if isinstance(self.train_val_test_ratio[0], float):
+            if self.mode == 'train':
+                offset = self.output_len if self.overlap else 0
+                return data[:train_len + offset].copy()
+            elif self.mode == 'valid':
+                offset_left = self.input_len - 1 if self.overlap else 0
+                offset_right = self.output_len if self.overlap else 0
+                return data[train_len - offset_left: train_len + valid_len + offset_right].copy()
+            else:  # self.mode == 'test'
+                offset = self.input_len - 1 if self.overlap else 0
+                return data[train_len + valid_len - offset:].copy()
+        else:
+            if self.mode == 'train':
+                offset = self.output_len if self.overlap else 0
+                return data[:train_len + self.output_len + self.input_len - 1].copy()
+            elif self.mode == 'valid':
+                offset_left = self.input_len - 1 if self.overlap else 0
+                offset_right = self.output_len if self.overlap else 0
+                test_start = -test_len - self.input_len - self.output_len + 1
+                return data[test_start - valid_len - self.input_len - self.output_len + 1 : test_start].copy()
+            else:  # self.mode == 'test'
+                offset = self.input_len - 1 if self.overlap else 0
+                return data[-test_len - self.input_len - self.output_len + 1:].copy()
 
-        if self.mode == 'train':
-            offset = self.output_len if self.overlap else 0
-            return data[:train_len + offset].copy()
-        elif self.mode == 'valid':
-            offset_left = self.input_len - 1 if self.overlap else 0
-            offset_right = self.output_len if self.overlap else 0
-            return data[train_len - offset_left : train_len + valid_len + offset_right].copy()
-        else:  # self.mode == 'test'
-            offset = self.input_len - 1 if self.overlap else 0
-            return data[train_len + valid_len - offset:].copy()
 
     def __getitem__(self, index: int) -> dict:
         """

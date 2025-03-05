@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 
 
@@ -21,7 +23,7 @@ def read_repr_file(filename):
     repr = result_obj['reprs']
     return repr
 
-def result_file_group_by_node(filename: str):
+def data_group_by_node(filename: str):
     """
     读取预测文件，输出一个张量，形状为(node, I, C)，其中node为节点数目，I为测试集有多少时间步，C为变量数目
     """
@@ -37,13 +39,13 @@ def result_file_group_by_node(filename: str):
     # note 整理输入值随时间变化
     return mae, inputs[:, -1, :, :].transpose((1, 0, 2))
 
-def result_file_group_by_node_and_cycle(filename: str, cycle: int):
+def data_group_by_node_and_cycle(filename: str, cycle: int):
     """
     读取预测的文件，输出一个张量，形状为(node, cycle, C)，cycle是循环一圈的时间步
     """
     # (N, I, C)
     # note 先规整一下mae的循环
-    mae_by_node, inputs = result_file_group_by_node(filename)
+    mae_by_node, inputs = data_group_by_node(filename)
     sum_cycles = mae_by_node.shape[1] // cycle
     remaining_timestamps = sum_cycles * cycle
     mae_by_node = mae_by_node[:, :remaining_timestamps]
@@ -56,3 +58,26 @@ def result_file_group_by_node_and_cycle(filename: str, cycle: int):
     inputs = inputs.reshape(new_shape)
     inputs = np.mean(inputs, axis=1)
     return mae_by_node, inputs
+
+
+def stat_node(file_dir: str, shape):
+    """
+    展示一个数据集，每一个节点的度数之和以及每一个节点的总交通流量，按照连接数量从大到小输出
+    """
+    # note 先展示哪一些节点连接量比较大
+    adj_path = os.path.join(file_dir, "adj_mx.pkl")
+    adj_mx = np.load(adj_path, allow_pickle=True)
+    out_degree = np.sum(adj_mx, axis=1)
+    in_degree = np.sum(adj_mx, axis=0)
+    degree = in_degree + out_degree
+    index_degree = np.argsort(degree, axis=0, )
+    #print(index_degree[::-1])
+    #print(degree[index_degree[::-1]])
+    # note 再展示哪一个节点流量比较大
+    # (I, N)
+    data = np.fromfile(os.path.join(file_dir, "data.dat"), dtype=np.float32).reshape(shape)[:, :, 0]
+    data = np.sum(data, axis=0)
+    index_flow = np.argsort(data, axis=0,)[::-1]
+    #print(index_flow)
+    #print(data[index_flow])
+    return index_degree[::-1], degree[index_degree[::-1]], index_flow, data[index_flow]
