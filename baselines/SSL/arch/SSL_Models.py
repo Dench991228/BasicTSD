@@ -26,6 +26,7 @@ class STID_SSL(STID):
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
                                                hard=kwargs["hard"])
+        self.use_future = kwargs['ssl_use_future'] if 'ssl_use_future' in kwargs else False
 
     def _forward(self, history_data: torch.Tensor, future_data: torch.Tensor,
                 batch_seen: int, epoch: int, train: bool,
@@ -46,11 +47,19 @@ class STID_SSL(STID):
             augmented_data[:, :, :, 0] += rand_noise
             # 之后再收集对比学习部分的损失
             augmented_forward_output = self._forward(augmented_data, future_data, batch_seen, epoch, train, return_repr)
-            ssl_loss = self.ssl_module(original_forward_output["representation"],
-                            augmented_forward_output["representation"],
-                            history_data[:, :, :, 0],
-                            augmented_data[:, :, :, 0]
-                            )
+            if not self.use_future:
+                ssl_loss = self.ssl_module(original_forward_output["representation"],
+                                augmented_forward_output["representation"],
+                                history_data[:, :, :, 0],
+                                augmented_data[:, :, :, 0]
+                                )
+            else:
+                ssl_loss = self.ssl_module(original_forward_output["representation"],
+                                augmented_forward_output["representation"],
+                                future_data[:, :, :, 0],
+                                augmented_data[:, :, :, 0]
+                                )
+
             original_forward_output['other_losses'] = [
                 {
                     "weight": self.ssl_loss_weight,
@@ -78,6 +87,7 @@ class STAEformer_SSL(STAEformer):
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
                                                hard=kwargs["hard"])
+        self.use_future = kwargs['ssl_use_future'] if 'ssl_use_future' in kwargs else False
 
     def _forward(self, history_data: torch.Tensor, future_data: torch.Tensor,
                 batch_seen: int, epoch: int, train: bool,
@@ -98,10 +108,18 @@ class STAEformer_SSL(STAEformer):
             augmented_data[:, :, :, 0] += rand_noise
             # 之后再收集对比学习部分的损失
             augmented_forward_output = self._forward(augmented_data, future_data, batch_seen, epoch, train, return_repr)
-            ssl_loss = self.ssl_module(original_forward_output["representation"],
-                            augmented_forward_output["representation"],
-                            history_data[:, :, :, 0],
-                            augmented_data[:, :, :, 0]
+            if not self.use_future:
+                ssl_loss = self.ssl_module(original_forward_output["representation"],
+                                augmented_forward_output["representation"],
+                                history_data[:, :, :, 0],
+                                augmented_data[:, :, :, 0]
+                                )
+            else:
+                print("use future!")
+                ssl_loss = self.ssl_module(original_forward_output["representation"],
+                                augmented_forward_output["representation"],
+                                future_data[:, :, :, 0],
+                                augmented_data[:, :, :, 0]
                             )
             original_forward_output['other_losses'] = [
                 {

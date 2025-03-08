@@ -3,8 +3,6 @@ import sys
 import torch
 from easydict import EasyDict
 
-from basicts.metrics.spatial_corr import spatial_corr
-from basicts.metrics.trend_mae import masked_trend_mae
 from .arch.SSL_Models import STAEformer_SSL
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
@@ -17,7 +15,7 @@ from basicts.utils import get_regular_settings, load_adj
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
-DATA_NAME = 'PEMS04'  # Dataset name
+DATA_NAME = 'PEMS08'  # Dataset name
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # Length of input sequence
 OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # Length of output sequence
@@ -29,7 +27,7 @@ NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 MODEL_ARCH = STAEformer_SSL
 
 MODEL_PARAM = {
-    "num_nodes" : 307,
+    "num_nodes" : 170,
     "in_steps": INPUT_LEN,
     "out_steps": OUTPUT_LEN,
     "steps_per_day": 288, # number of time steps per day
@@ -51,6 +49,7 @@ MODEL_PARAM = {
     "tau": 1.0,
     "hard": False,
     "similarity_metric": "mse",
+    "ssl_use_future": True,
 }
 NUM_EPOCHS = 100
 
@@ -103,8 +102,6 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAE': masked_mae,
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
-                                'spatial_corr': spatial_corr,
-                                'trend_MAE': masked_trend_mae
                             })
 CFG.METRICS.TARGET = 'MAE'
 CFG.METRICS.NULL_VAL = NULL_VAL
@@ -141,18 +138,18 @@ CFG.TRAIN.DATA.SHUFFLE = True
 CFG.VAL = EasyDict()
 CFG.VAL.INTERVAL = 1
 CFG.VAL.DATA = EasyDict()
-CFG.VAL.DATA.BATCH_SIZE = 16
+CFG.VAL.DATA.BATCH_SIZE = 64
 
 ############################## Test Configuration ##############################
 CFG.TEST = EasyDict()
 CFG.TEST.INTERVAL = 1
 CFG.TEST.DATA = EasyDict()
-CFG.TEST.DATA.BATCH_SIZE = 16
+CFG.TEST.DATA.BATCH_SIZE = 64
 
 ############################## Evaluation Configuration ##############################
 
 CFG.EVAL = EasyDict()
 
 # Evaluation parameters
-CFG.EVAL.HORIZONS = [i for i in range(1, 13)] # Prediction horizons for evaluation. Default: []
+CFG.EVAL.HORIZONS = [3, 6, 12] # Prediction horizons for evaluation. Default: []
 CFG.EVAL.USE_GPU = True # Whether to use GPU for evaluation. Default: True

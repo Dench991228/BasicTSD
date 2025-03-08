@@ -91,6 +91,7 @@ class WaveNet(nn.Module):
         Returns:
             torch.Tensor: [B, L, N, 1]
         """
+        # (B, L, N, C) -> (B, C, N, L)
         input = history_data.transpose(1, 3).contiguous()
         in_len = input.size(3)
         if in_len < self.receptive_field:
@@ -98,6 +99,7 @@ class WaveNet(nn.Module):
                 input, (self.receptive_field-in_len, 0, 0, 0))
         else:
             x = input
+        # (B, C, N, L) -> (B, H, N, L)
         x = self.start_conv(x)
         skip = 0
 
@@ -118,14 +120,16 @@ class WaveNet(nn.Module):
             #residual = dilation_func(x, dilation, init_dilation, i)
             residual = x
             # dilated convolution
+            # note 进行时序卷积
             filter = self.filter_convs[i](residual)
             filter = torch.tanh(filter)
             gate = self.gate_convs[i](residual)
             gate = torch.sigmoid(gate)
+            # note 局部滤波，计算向上传递内容
             x = filter * gate
 
             # parametrized skip connection
-
+            # note 计算skip connection
             s = x
             s = self.skip_convs[i](s)
             try:
@@ -133,7 +137,7 @@ class WaveNet(nn.Module):
             except:
                 skip = 0
             skip = s + skip
-
+            # note channel mixing
             x = self.residual_convs[i](x)
 
             x = x + residual[:, :, :, -x.size(3):]

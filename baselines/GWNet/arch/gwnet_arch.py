@@ -15,6 +15,7 @@ class nconv(nn.Module):
         super(nconv, self).__init__()
 
     def forward(self, x, A):
+        # (B, D, N, T), (N, N) ->
         x = torch.einsum('ncvl,vw->ncwl', (x, A))
         return x.contiguous()
 
@@ -43,6 +44,8 @@ class gcn(nn.Module):
         self.order = order
 
     def forward(self, x, support):
+        # (B, dilation, N, L)
+        # note token mixing
         out = [x]
         for a in support:
             x1 = self.nconv(x, a.to(x.device))
@@ -186,6 +189,7 @@ class GraphWaveNet(nn.Module):
         Returns:
             torch.Tensor: [B, L, N, 1]
         """
+        # (B, L, N, C) -> (B, C, N, L)
         input = history_data.transpose(1, 3).contiguous()
         in_len = input.size(3)
         if in_len < self.receptive_field:
@@ -193,6 +197,7 @@ class GraphWaveNet(nn.Module):
                 input, (self.receptive_field-in_len, 0, 0, 0))
         else:
             x = input
+        # (B, C, N, L) -> (B, residual, N, L)
         x = self.start_conv(x)
         skip = 0
 
@@ -220,6 +225,7 @@ class GraphWaveNet(nn.Module):
             #residual = dilation_func(x, dilation, init_dilation, i)
             residual = x
             # dilated convolution
+            # (B, residual, N, L) -> (B, dilation, N, L)
             filter = self.filter_convs[i](residual)
             filter = torch.tanh(filter)
             gate = self.gate_convs[i](residual)
