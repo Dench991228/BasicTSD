@@ -160,22 +160,26 @@ class STAEformer(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.use_mixed_proj = use_mixed_proj
-
+        # note 嵌入的部分
         self.input_proj = nn.Linear(input_dim, input_embedding_dim)
         if tod_embedding_dim > 0:
+            # note (steps per day, d_tod)
             self.tod_embedding = nn.Embedding(steps_per_day, tod_embedding_dim)
         if dow_embedding_dim > 0:
+            # note (day per week, d_dow)
             self.dow_embedding = nn.Embedding(7, dow_embedding_dim)
         if spatial_embedding_dim > 0:
+            # note (nodes, d_s)
             self.node_emb = nn.Parameter(
                 torch.empty(self.num_nodes, self.spatial_embedding_dim)
             )
             nn.init.xavier_uniform_(self.node_emb)
         if adaptive_embedding_dim > 0:
+            # note (in_steps, nodes, d_a)
             self.adaptive_embedding = nn.init.xavier_uniform_(
                 nn.Parameter(torch.empty(in_steps, num_nodes, adaptive_embedding_dim))
             )
-
+        # note 回归头
         if use_mixed_proj:
             self.output_proj = nn.Linear(
                 in_steps * self.model_dim, out_steps * output_dim
