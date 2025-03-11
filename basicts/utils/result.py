@@ -9,10 +9,7 @@ def read_result_file(filename):
     """
     # note 先读取三个文件
     result_obj = np.load(filename)
-    target = result_obj['target']
-    prediction = result_obj['prediction']
-    inputs = result_obj['inputs']
-    return inputs, target, prediction
+    return result_obj
 
 def read_repr_file(filename):
     """

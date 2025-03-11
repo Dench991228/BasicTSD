@@ -67,20 +67,28 @@ def visualize_amplitude_change(file_dir: str, sensor_id: int = 0):
 
 def visualize_prediction(file_dir: str,
                          sensor_id: int = 0,
-                         horizon: int = 11,):
-    inputs, target, prediction = read_result_file(file_dir)
-    data = target[:, horizon, sensor_id, 0]
-    pred = prediction[:, horizon, sensor_id, 0]
+                         horizon: int = 11,
+                         mode: str = "overall"):
+    result_dict = read_result_file(file_dir)
+    if mode == "trend":
+        data = result_dict['target_trend'][:, horizon, sensor_id, 0]
+        pred = result_dict['prediction_trend'][:, horizon, sensor_id, 0]
+    elif mode == "overall":
+        data = result_dict['target'][:, horizon, sensor_id, 0]
+        pred = result_dict['prediction'][:, horizon, sensor_id, 0]
+    else:
+        data = result_dict['target'][:, horizon, sensor_id, 0] - result_dict['target_trend'][:, horizon, sensor_id, 0]
+        pred = result_dict['prediction'][:, horizon, sensor_id, 0] - result_dict['prediction_trend'][:, horizon, sensor_id, 0]
     x = np.arange(data.shape[0])
     # 输出位置
     fig_dir = os.path.join(os.path.dirname(file_dir), "visualize_result")
     os.makedirs(fig_dir, exist_ok=True)
     # 开始绘图
     plot_line(base_folder=fig_dir,
-              title=f"Visualization of Sensor {sensor_id} on Horizon {horizon+1}",
+              title=f"Visualization of Sensor {sensor_id} on Horizon {horizon+1} {mode}",
               x=x, ys=[data, pred, np.abs(data-pred)], y_names=["Label", 'Prediction', 'error'],
               x_axis_name="time steps", y_axis_name="value",
-              y_min=min(data), y_max=max(data))
+              )
 
 def visualize_mean_prediction(file_dir: str,
                               sensor_id: int = 0,

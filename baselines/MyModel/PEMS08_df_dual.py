@@ -6,7 +6,7 @@ from easydict import EasyDict
 from .arch.DecomposeFormer import DecomposeFormer
 from .arch.DecomposeFormer_adv import DecomposeFormer_adv
 from .arch.MyFormer import MyFormer
-from .loss import NewDecomposeFormerLoss
+from .loss import NewDecomposeFormerLoss, DualDecomposeFormerLoss
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
 
@@ -111,7 +111,7 @@ CFG.TRAIN.CKPT_SAVE_DIR = os.path.join(
     MODEL_ARCH.__name__,
     '_'.join([DATA_NAME, str(CFG.TRAIN.NUM_EPOCHS), str(INPUT_LEN), str(OUTPUT_LEN)])
 )
-CFG.TRAIN.LOSS = masked_mae
+CFG.TRAIN.LOSS = DualDecomposeFormerLoss
 # Optimizer settings
 CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"
