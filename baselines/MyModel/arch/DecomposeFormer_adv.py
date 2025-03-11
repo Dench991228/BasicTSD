@@ -91,12 +91,12 @@ class DecomposeFormer_adv(nn.Module):
         trend_components = torch.cat([trend_components.unsqueeze(-1), history_data[:, :, :, 1:]], dim=-1)
         #print("after decompose",trend_components.shape, seasonal_components.shape)
         # (bs, T, num_nodes, model_dim)
-        trend_components = self.trend_embedding(trend_components)
-        seasonal_components = self.seasonal_embedding(seasonal_components)
+        trend_embeddings = self.trend_embedding(trend_components)
+        seasonal_embeddings = self.seasonal_embedding(seasonal_components)
         #print("after embedding", trend_components.shape, seasonal_components.shape)
         batch_size = x.shape[0]
 
-        x = torch.stack([trend_components, seasonal_components], dim=-2)
+        x = torch.stack([trend_embeddings, seasonal_embeddings], dim=-2)
         #print("before deep", x.shape)
         # note 花式变换 (batch_size, in_steps, num_nodes, 2, model_dim)
         for attn in self.attn_layers:
@@ -125,13 +125,15 @@ class DecomposeFormer_adv(nn.Module):
         if not return_repr:
             return {
                 "prediction": out,
-                "trend_prediction": pred_trend if train else None,
-                "trend_label": future_trend
+                "prediction_trend": pred_trend,
+                "target_trend": future_trend,
+                "input_trend": trend_components[:, :, :, :1],
             }
         else:
             return {
                 "prediction": out,
-                "trend_prediction": pred_trend if train else None,
                 "representation": repr,
-                "trend_label": future_trend
+                "prediction_trend": pred_trend,
+                "target_trend": future_trend,
+                "input_trend": trend_components[:, :, :, :1],
             }

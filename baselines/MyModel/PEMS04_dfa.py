@@ -7,7 +7,7 @@ from basicts.metrics.spatial_corr import spatial_corr
 from basicts.metrics.trend_mae import masked_trend_mae
 from .arch.DecomposeFormer import DecomposeFormer
 from .arch.DecomposeFormer_adv import DecomposeFormer_adv
-from .loss import decomposeFormerLoss
+from .loss import NewDecomposeFormerLoss
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
 from .arch.MyFormer import MyFormer
@@ -115,7 +115,7 @@ CFG.TRAIN.CKPT_SAVE_DIR = os.path.join(
     MODEL_ARCH.__name__,
     '_'.join([DATA_NAME, str(CFG.TRAIN.NUM_EPOCHS), str(INPUT_LEN), str(OUTPUT_LEN)])
 )
-CFG.TRAIN.LOSS = decomposeFormerLoss
+CFG.TRAIN.LOSS = NewDecomposeFormerLoss
 # Optimizer settings
 CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"
@@ -127,7 +127,7 @@ CFG.TRAIN.OPTIM.PARAM = {
 CFG.TRAIN.LR_SCHEDULER = EasyDict()
 CFG.TRAIN.LR_SCHEDULER.TYPE = "MultiStepLR"
 CFG.TRAIN.LR_SCHEDULER.PARAM = {
-    "milestones": [20, 25],
+    "milestones": [20, 50],
     "gamma": 0.1
 }
 # Train data loader settings

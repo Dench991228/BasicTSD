@@ -340,7 +340,6 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
 
         iter_num = (epoch - 1) * self.iter_per_epoch + iter_index
         forward_return = self.forward(data=data, epoch=epoch, iter_num=iter_num, train=True)
-
         if self.cl_param:
             cl_length = self.curriculum_learning(epoch=epoch)
             forward_return['prediction'] = forward_return['prediction'][:, :cl_length, :, :]
@@ -419,6 +418,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         """
 
         prediction, target, inputs = [], [], []
+        prediction_trend, target_trend, input_trend = [], [], []
         # count_batches * (B, Node, feature)
         reprs = []
         for data in tqdm(self.test_data_loader):
@@ -435,6 +435,11 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
             prediction.append(forward_return['prediction'])
             target.append(forward_return['target'])
             inputs.append(forward_return['inputs'])
+            if "input_trend" in forward_return:
+                input_trend.append(forward_return['input_trend'])
+                target_trend.append(forward_return['target_trend'])
+                prediction_trend.append(forward_return['prediction_trend'])
+
             if "representation" in forward_return:
                 reprs.append(forward_return['representation'].detach().cpu())
 
@@ -442,6 +447,15 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         target = torch.cat(target, dim=0)
         inputs = torch.cat(inputs, dim=0)
         returns_all = {'prediction': prediction, 'target': target, 'inputs': inputs}
+        if len(prediction_trend) > 0:
+            prediction_trend = torch.cat(prediction_trend, dim=0)
+            target_trend = torch.cat(target_trend, dim=0)
+            input_trend = torch.cat(input_trend, dim=0)
+            returns_all['prediction_trend'] = prediction_trend
+            returns_all['target_trend'] = target_trend
+            returns_all['input_trend'] = input_trend
+        for key in returns_all:
+            print(key, returns_all[key].shape)
         metrics_results = self.compute_evaluation_metrics(returns_all)
 
         # save

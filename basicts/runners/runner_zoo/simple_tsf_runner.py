@@ -47,12 +47,20 @@ class SimpleTimeSeriesForecastingRunner(BaseTimeSeriesForecastingRunner):
             Dict: Processed data.
         """
 
-        # rescale data
+        # note rescale data，仅在评测时生效
         if self.scaler is not None and self.scaler.rescale:
             input_data['prediction'] = self.scaler.inverse_transform(input_data['prediction'])
             input_data['target'] = self.scaler.inverse_transform(input_data['target'])
             input_data['inputs'] = self.scaler.inverse_transform(input_data['inputs'])
-
+            for key in input_data:
+                if key in {"prediction", "target", "inputs"}:
+                    continue
+                for s in {"prediction", "target", "input"}:
+                    if s in key:
+                        # print(key)
+                        inversed = self.scaler.inverse_transform(input_data[key])
+                        # print(key, self.scaler.mean, self.scaler.std, torch.mean(input_data[key]), torch.mean(self.scaler.inverse_transform(input_data[key])))
+                        input_data[key] = inversed
         # subset forecasting
         if self.target_time_series is not None:
             input_data['target'] = input_data['target'][:, :, self.target_time_series, :]
@@ -93,9 +101,9 @@ class SimpleTimeSeriesForecastingRunner(BaseTimeSeriesForecastingRunner):
         history_data = self.select_input_features(history_data)
         future_data_4_dec = self.select_input_features(future_data)
 
-        if not train:
+        #if not train:
             # For non-training phases, use only temporal features
-            future_data_4_dec[..., 0] = torch.empty_like(future_data_4_dec[..., 0])
+            #future_data_4_dec[..., 0] = torch.empty_like(future_data_4_dec[..., 0])
 
         # Forward pass through the model
         model_return = self.model(history_data=history_data, future_data=future_data_4_dec,

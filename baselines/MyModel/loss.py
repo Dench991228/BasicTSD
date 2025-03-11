@@ -4,7 +4,7 @@ import numpy as np
 from basicts.metrics import masked_mae
 
 
-def decomposeFormerLoss(prediction: torch.Tensor, target: torch.Tensor, null_val, trend_prediction: torch.Tensor, trend_label: torch.Tensor, **kwargs) -> torch.Tensor:
+def NewDecomposeFormerLoss(prediction: torch.Tensor, target: torch.Tensor, null_val, prediction_trend: None, target_trend: None, **kwargs) -> torch.Tensor:
     """Masked mean absolute error.
 
     Args:
@@ -16,7 +16,11 @@ def decomposeFormerLoss(prediction: torch.Tensor, target: torch.Tensor, null_val
         torch.Tensor: masked mean absolute error
     """
     loss = masked_mae(prediction, target, null_val)
-    if trend_prediction is not None:
-        t_loss = masked_mae(trend_prediction, trend_label, null_val)
-        loss += t_loss
+    lloss = None
+    if prediction_trend is not None:
+        lloss = masked_mae(prediction_trend, target_trend, null_val)
+    # print(loss, lloss)
+    if lloss is not None:
+        loss += lloss
+
     return loss
