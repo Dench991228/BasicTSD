@@ -48,6 +48,7 @@ MODEL_PARAM = {
     "num_layers": 3,
     "dropout": 0.1,
     "use_mixed_proj": True,
+    "kernel": 5
 }
 NUM_EPOCHS = 100
 

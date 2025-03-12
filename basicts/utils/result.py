@@ -26,7 +26,10 @@ def data_group_by_node(filename: str):
     """
     # note 整理mae随时间变化
     # 形状为(I, T, N, C)
-    inputs, target, prediction = read_result_file(filename)
+    output_items = read_result_file(filename)
+    inputs = output_items['inputs']
+    target = output_items['target']
+    prediction = output_items['prediction']
     # (I, T, N, C)
     error = np.abs(target-prediction)
     # (I, T, N, C) -> (I, N, C)

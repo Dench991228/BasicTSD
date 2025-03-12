@@ -76,6 +76,9 @@ def visualize_prediction(file_dir: str,
     elif mode == "overall":
         data = result_dict['target'][:, horizon, sensor_id, 0]
         pred = result_dict['prediction'][:, horizon, sensor_id, 0]
+    elif mode == "trend_only":
+        data = result_dict['target'][:, horizon, sensor_id, 0]
+        pred = result_dict['prediction_trend'][:, horizon, sensor_id, 0]
     else:
         data = result_dict['target'][:, horizon, sensor_id, 0] - result_dict['target_trend'][:, horizon, sensor_id, 0]
         pred = result_dict['prediction'][:, horizon, sensor_id, 0] - result_dict['prediction_trend'][:, horizon, sensor_id, 0]

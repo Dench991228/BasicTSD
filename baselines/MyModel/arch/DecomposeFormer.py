@@ -111,17 +111,18 @@ class SelfAttentionLayer(nn.Module):
         return out
 
 class DecomposeFormer_layer(nn.Module):
-    def __init__(self, model_dim: int, num_heads=8, dropout=0, mask=False):
+    def __init__(self, model_dim: int, feed_forward_dim: int, num_heads=8, dropout=0, mask=False):
         super().__init__()
         # note 空间变换的两个矩阵
-        self.spatial_attention_trend = SelfAttentionLayer(model_dim, model_dim * 2, num_heads)
-        self.spatial_attention_seasonal = SelfAttentionLayer(model_dim, model_dim * 2, num_heads)
+        self.spatial_attention_trend = SelfAttentionLayer(model_dim, feed_forward_dim, num_heads, dropout)
+        self.spatial_attention_seasonal = SelfAttentionLayer(model_dim, feed_forward_dim, num_heads, dropout)
         # note 时序变换的两个矩阵
-        self.temporal_attention_trend = SelfAttentionLayer(model_dim, model_dim * 2, num_heads)
-        self.temporal_attention_seasonal = SelfAttentionLayer(model_dim, model_dim * 2, num_heads)
+        self.temporal_attention_trend = SelfAttentionLayer(model_dim, feed_forward_dim, num_heads, dropout)
+        self.temporal_attention_seasonal = SelfAttentionLayer(model_dim, feed_forward_dim, num_heads, dropout)
         # note 分量变换的矩阵
         # (bs, T, num_nodes, model_dim * 2) -> (bs, T, num_nodes, model_dim*2)
         self.ln = nn.LayerNorm(model_dim * 2)
+        self.dropout_layer = nn.Dropout(dropout)
         self.adapter = nn.Sequential(
             nn.Linear(model_dim*2, model_dim*4),
             nn.ReLU(inplace=True),
@@ -153,9 +154,10 @@ class DecomposeFormer_layer(nn.Module):
         x_seasonal_out = self.spatial_attention_seasonal(x_seasonal_out, dim=2)
         # note 进行模态之间的变换
         # (bs, T, num_nodes, model_dim*2)
-        x_final = torch.cat([x_trend_out, x_trend_out], dim=-1)
+        x_final = torch.cat([x_trend_out, x_seasonal_out], dim=-1)
         residual = x_final
         x_final = self.adapter(x_final)
+        x_final = self.dropout_layer(x_final)
         x_final = self.ln(x_final + residual)
         x_final = x_final.reshape(bs, T, num_nodes, 2, model_dim)
         return x_final

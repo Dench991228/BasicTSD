@@ -384,15 +384,14 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         metrics_results = {}
         for i in self.evaluation_horizons:
             # (Count_items, T, N, C)
-            pred = returns_all['prediction'][:, i, :, :]
-            real = returns_all['target'][:, i, :, :]
+            temporal_dict = {k:returns_all[k][:, i, :, :] for k in returns_all.keys()}
 
             metrics_results[f'horizon_{i + 1}'] = {}
             metric_repr = ''
             for metric_name, metric_func in self.metrics.items():
                 if metric_name.lower() == 'mase':
                     continue # MASE needs to be calculated after all horizons
-                metric_item = self.metric_forward(metric_func, {'prediction': pred, 'target': real})
+                metric_item = self.metric_forward(metric_func, temporal_dict)
                 metric_repr += f', Test {metric_name}: {metric_item.item():.4f}'
                 metrics_results[f'horizon_{i + 1}'][metric_name] = metric_item.item()
                 self.update_epoch_meter(f'test/{metric_name}/horizon_{i+1}', metric_item.item())
@@ -422,7 +421,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         # count_batches * (B, Node, feature)
         reprs = []
         for data in tqdm(self.test_data_loader):
-            forward_return = self.forward(data, epoch=None, iter_num=None, train=False)
+            forward_return = self.forward(data, epoch=None, iter_num=None, train=False, return_repr=True if (train_epoch is None or train_epoch == self.num_epochs) else False)
 
             loss = self.metric_forward(self.loss, forward_return)
             self.update_epoch_meter('test/loss', loss.item())

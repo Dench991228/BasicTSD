@@ -3,13 +3,14 @@ import sys
 import torch
 from easydict import EasyDict
 
-from basicts.metrics.trend_masked_mae import trend_masked_mae, seasonal_masked_mae, trend_only_masked_mae
+from basicts.metrics.spatial_corr import spatial_corr
+from basicts.metrics.trend_mae import masked_trend_mae
 from .arch.DecomposeFormer import DecomposeFormer
 from .arch.DecomposeFormer_adv import DecomposeFormer_adv
-from .arch.MyFormer import MyFormer
 from .loss import NewDecomposeFormerLoss, DualDecomposeFormerLoss
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
+from .arch.MyFormer import MyFormer
 
 from basicts.metrics import masked_mae, masked_mape, masked_rmse
 from basicts.data import TimeSeriesForecastingDataset
@@ -20,7 +21,7 @@ from basicts.utils import get_regular_settings, load_adj
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
-DATA_NAME = 'PEMS08'  # Dataset name
+DATA_NAME = 'PEMS04'  # Dataset name
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # Length of input sequence
 OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # Length of output sequence
@@ -32,7 +33,7 @@ NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 MODEL_ARCH = DecomposeFormer_adv
 
 MODEL_PARAM = {
-    "num_nodes" : 170,
+    "num_nodes" : 307,
     "in_steps": INPUT_LEN,
     "out_steps": OUTPUT_LEN,
     "steps_per_day": 288, # number of time steps per day
@@ -100,9 +101,8 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAE': masked_mae,
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
-                                'trend_MAE': trend_masked_mae,
-                                "seasonal_MAE": seasonal_masked_mae,
-                                "trend_only_MAE": trend_only_masked_mae
+                                'spatial_corr': spatial_corr,
+                                'trend_MAE': masked_trend_mae
                             })
 CFG.METRICS.TARGET = 'MAE'
 CFG.METRICS.NULL_VAL = NULL_VAL
@@ -127,7 +127,7 @@ CFG.TRAIN.OPTIM.PARAM = {
 CFG.TRAIN.LR_SCHEDULER = EasyDict()
 CFG.TRAIN.LR_SCHEDULER.TYPE = "MultiStepLR"
 CFG.TRAIN.LR_SCHEDULER.PARAM = {
-    "milestones": [20, 50],
+    "milestones": [20, 25],
     "gamma": 0.1
 }
 # Train data loader settings
@@ -152,5 +152,5 @@ CFG.TEST.DATA.BATCH_SIZE = 64
 CFG.EVAL = EasyDict()
 
 # Evaluation parameters
-CFG.EVAL.HORIZONS = [i for i in range(1,13)] # Prediction horizons for evaluation. Default: []
+CFG.EVAL.HORIZONS = [i for i in range(1, 13)] # Prediction horizons for evaluation. Default: []
 CFG.EVAL.USE_GPU = True # Whether to use GPU for evaluation. Default: True

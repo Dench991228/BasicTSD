@@ -107,7 +107,7 @@ class SimpleTimeSeriesForecastingRunner(BaseTimeSeriesForecastingRunner):
 
         # Forward pass through the model
         model_return = self.model(history_data=history_data, future_data=future_data_4_dec,
-                                  batch_seen=iter_num, epoch=epoch, train=train, return_repr=False)
+                                  batch_seen=iter_num, epoch=epoch, train=train, **kwargs)
 
         # Parse model return
         if isinstance(model_return, torch.Tensor):

@@ -48,6 +48,7 @@ MODEL_PARAM = {
     "num_layers": 3,
     "dropout": 0.1,
     "use_mixed_proj": True,
+    "kernel": 3
 }
 NUM_EPOCHS = 100
 
@@ -115,7 +116,7 @@ CFG.TRAIN.CKPT_SAVE_DIR = os.path.join(
     MODEL_ARCH.__name__,
     '_'.join([DATA_NAME, str(CFG.TRAIN.NUM_EPOCHS), str(INPUT_LEN), str(OUTPUT_LEN)])
 )
-CFG.TRAIN.LOSS = DualDecomposeFormerLoss
+CFG.TRAIN.LOSS = NewDecomposeFormerLoss
 # Optimizer settings
 CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"

@@ -30,6 +30,7 @@ class DecomposeFormer_adv(nn.Module):
         num_layers=3,
         dropout=0.1,
         use_mixed_proj=True,
+        kernel: int = 3,
         **kwargs
     ):
         super().__init__()
@@ -70,10 +71,11 @@ class DecomposeFormer_adv(nn.Module):
         else:
             self.temporal_proj = nn.Linear(in_steps, out_steps)
             self.output_proj = nn.Linear(self.model_dim*2, self.output_dim)
-        self.decomposer = moving_avg(kernel_size=3, stride=1)
+        print("Kernel Size", kernel)
+        self.decomposer = moving_avg(kernel_size=kernel, stride=1)
         self.attn_layers = nn.ModuleList(
             [
-                DecomposeFormer_layer(self.model_dim, num_heads, dropout)
+                DecomposeFormer_layer(self.model_dim, feed_forward_dim, num_heads, dropout)
                 for _ in range(num_layers)
             ]
         )
