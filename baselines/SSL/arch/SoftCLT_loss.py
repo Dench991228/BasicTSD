@@ -74,14 +74,14 @@ class SoftCLT_Loss(nn.Module):
             # note 得到最终的对比损失
             loss = logits * soft_label_no_diag
             loss = torch.mean(loss)
-            print(torch.mean(soft_label), loss)
+            # print(torch.mean(soft_label), loss)
         else: # 如果是硬对比学习，就和自己对比即可
             # note 这一部分是原始样本和增强样本的对比
             i = torch.arange(batch_size, device=original_series.device)
             loss1 = torch.mean(logits[i, batch_size + i - 1])
             loss2 = torch.mean(logits[batch_size + i, i])
             loss = (loss1 + loss2) / 2
-            print(loss)
+            # print(loss)
         return loss
 
     def pairwise_dist_mse(self, all_features: torch.Tensor):
