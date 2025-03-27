@@ -51,7 +51,6 @@ MODEL_PARAM = {
     "tau": 1.0,
     "hard": False,
     "similarity_metric": "mse",
-    "use_aug": False,
 }
 NUM_EPOCHS = 100
 
@@ -107,7 +106,7 @@ CFG.METRICS.FUNCS = EasyDict({
                                 "trend_MAE": trend_masked_mae,
                                 "trend_only_MAE": trend_only_masked_mae,
                                 "seasonal_MAE": seasonal_masked_mae,
-})
+                            })
 CFG.METRICS.TARGET = 'MAE'
 CFG.METRICS.NULL_VAL = NULL_VAL
 

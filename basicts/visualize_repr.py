@@ -2,6 +2,8 @@ import os.path
 from typing import List
 
 import numpy as np
+import torch
+from tqdm import tqdm
 
 from basicts.utils.result import read_repr_file
 from basicts.utils.visualize import  plot_line
@@ -72,3 +74,39 @@ def visualize_repr_decompose(repr_result_file, window_ids: List[int], sensor_ids
         plot_line(title=f"Feature Similarity Referring to window {window_id} of sensor {sensor_id}",
                   x=x, ys=cos, y_names=[f"feature distance {s}" for s in ['trend', 'seasonal']], y_axis_name="cosine_distance", w=window_id,
                   base_folder=os.path.dirname(repr_result_file))
+
+def time_slot_similarity(repr_result_file: str, time_slots_per_day: int = 288, min:int = None, max: int = None):
+    """
+    展现一个模型，不同的day_of_time编码的特征相似度
+    :param repr_result_file: 特征的文件
+    :param time_slots_per_day: 每天有几个time slots
+    """
+    # (I, Node, model_dim)
+    reprs = read_repr_file(repr_result_file)
+    total_preds, sensors, feature_dim = reprs.shape
+    device = "cuda"
+    time_slot_similarities = []
+    for i in tqdm(range(total_preds)):
+        # (Node, model_dim)
+        features = torch.from_numpy(reprs[i, :, :])
+        features = features.to(device=device)
+        # (Node, 1)
+        norm_features = torch.norm(features, dim=1, keepdim=True)
+        normalized_features = features / norm_features
+        similarities = torch.matmul(normalized_features, normalized_features.T)
+        time_slot_similarities.append(torch.mean(similarities))
+    count_cycles = total_preds // time_slots_per_day
+    time_slot_similarities = torch.Tensor(time_slot_similarities)
+    time_slot_similarities = time_slot_similarities[:count_cycles * time_slots_per_day]
+    time_slot_similarities = torch.reshape(time_slot_similarities, (-1, time_slots_per_day))
+    time_slot_similarities = torch.mean(time_slot_similarities, dim=0).cpu().numpy()
+    return time_slot_similarities
+
+def visualize_similarities(repr_files: List, names:List, time_slots_per_day = 288):
+    assert len(repr_files) == len(names)
+    collected_similarities = []
+    for f in repr_files:
+        collected_similarities.append(time_slot_similarity(f, time_slots_per_day=time_slots_per_day))
+    plot_line(title="Time slot mean similarities of each model",
+              x=[i for i in range(time_slots_per_day)], ys=collected_similarities, y_names=names,
+              y_axis_name="mean similarity")

@@ -5,7 +5,8 @@ import torch
 from baselines.MyModel.arch.DecomposeFormer import DecomposeFormer
 from baselines.MyModel.arch.DecomposeFormer_tts import DecomposeFormer_TTS
 from baselines.SSL.arch.PatchPerm import PatchPermAugmentation
-from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub, SoftCLT_Loss_Graph
+from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub, SoftCLT_Loss_Graph, \
+    SoftCLT_Loss_Graph_Relative, SoftCLT_Loss_Graph_Relative_R
 from baselines.STAEformer.arch.staeformer_arch import STAEformer
 from baselines.STID.arch.stid_arch import STID
 
@@ -148,6 +149,12 @@ class STAEformer_SSL_G(STAEformer):
                 print("softclt_sub")
                 self.ssl_module = SoftCLT_Loss_Sub(**kwargs)
                 self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "softclt_gr":
+                self.ssl_module = SoftCLT_Loss_Graph_Relative(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "softclt_grr":
+                self.ssl_module = SoftCLT_Loss_Graph_Relative_R(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
                                                hard=kwargs["hard"])
@@ -172,6 +179,7 @@ class STAEformer_SSL_G(STAEformer):
             augmented_data[:, :, :, 0] += rand_noise
             # 之后再收集对比学习部分的损失
             augmented_forward_output = self._forward(augmented_data, future_data, batch_seen, epoch, train, True)
+            # print("day of week and time of day", history_data[:, 0, 0, 1:])
             if not self.use_future:
                 ssl_loss = self.ssl_module(original_forward_output["representation"],
                                 augmented_forward_output["representation"],

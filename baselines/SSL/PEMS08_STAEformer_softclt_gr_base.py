@@ -3,8 +3,8 @@ import sys
 import torch
 from easydict import EasyDict
 
-from basicts.metrics.trend_masked_mae import trend_masked_mae, trend_only_masked_mae
-from .arch.SSL_Models import STAEformer_SSL, DecomposeFormer_TTS_SSL
+from basicts.metrics.trend_masked_mae import trend_masked_mae, trend_only_masked_mae, seasonal_masked_mae
+from .arch.SSL_Models import STAEformer_SSL, DecomposeFormer_TTS_SSL, STAEformer_SSL_G
 from ..MyModel.loss import NewDecomposeFormerLoss
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
@@ -26,7 +26,7 @@ NORM_EACH_CHANNEL = regular_settings['NORM_EACH_CHANNEL'] # Whether to normalize
 RESCALE = regular_settings['RESCALE'] # Whether to rescale the data
 NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 # Model architecture and parameters
-MODEL_ARCH = DecomposeFormer_TTS_SSL
+MODEL_ARCH = STAEformer_SSL_G
 
 MODEL_PARAM = {
     "num_nodes" : 170,
@@ -45,8 +45,8 @@ MODEL_PARAM = {
     "num_layers": 3,
     "dropout": 0.1,
     "use_mixed_proj": True,
-    "ssl_name": "softclt",
-    "ssl_loss_weight": 20,
+    "ssl_name": "softclt_gr",
+    "ssl_loss_weight": 1,
     "alpha": 1.0,
     "tau": 1.0,
     "hard": False,
@@ -103,8 +103,6 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAE': masked_mae,
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
-                                "trend_MAE": trend_masked_mae,
-                                "trend_only_MAE": trend_only_masked_mae
                             })
 CFG.METRICS.TARGET = 'MAE'
 CFG.METRICS.NULL_VAL = NULL_VAL
@@ -117,7 +115,7 @@ CFG.TRAIN.CKPT_SAVE_DIR = os.path.join(
     MODEL_ARCH.__name__,
     '_'.join([DATA_NAME, str(CFG.TRAIN.NUM_EPOCHS), str(INPUT_LEN), str(OUTPUT_LEN)])
 )
-CFG.TRAIN.LOSS = NewDecomposeFormerLoss
+CFG.TRAIN.LOSS = masked_mae
 # Optimizer settings
 CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"

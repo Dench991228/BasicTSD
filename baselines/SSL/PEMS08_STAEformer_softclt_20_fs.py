@@ -44,7 +44,7 @@ MODEL_PARAM = {
     "dropout": 0.1,
     "use_mixed_proj": True,
     "ssl_name": "softclt",
-    "ssl_loss_weight": 20,
+    "ssl_loss_weight": 1,
     "alpha": 1.0,
     "tau": 1.0,
     "hard": False,
@@ -137,13 +137,13 @@ CFG.TRAIN.DATA.SHUFFLE = True
 CFG.VAL = EasyDict()
 CFG.VAL.INTERVAL = 1
 CFG.VAL.DATA = EasyDict()
-CFG.VAL.DATA.BATCH_SIZE = 64
+CFG.VAL.DATA.BATCH_SIZE = 16
 
 ############################## Test Configuration ##############################
 CFG.TEST = EasyDict()
 CFG.TEST.INTERVAL = 1
 CFG.TEST.DATA = EasyDict()
-CFG.TEST.DATA.BATCH_SIZE = 64
+CFG.TEST.DATA.BATCH_SIZE = 16
 
 ############################## Evaluation Configuration ##############################
 
