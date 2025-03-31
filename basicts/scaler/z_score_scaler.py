@@ -62,6 +62,7 @@ class ZScoreScaler(BaseScaler):
             if self.std == 0:
                 self.std = 1.0  # prevent division by zero by setting std to 1 where it's 0
         self.mean, self.std = torch.tensor(self.mean), torch.tensor(self.std)
+        print("mean and std of dataset: ", self.mean, self.std)
 
     def transform(self, input_data: torch.Tensor) -> torch.Tensor:
         """

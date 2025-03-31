@@ -109,13 +109,9 @@ class SelfAttentionLayer(nn.Module):
         return out
 
 
-class STAEformer(nn.Module):
+class BaseFormer(nn.Module):
     """
-    Paper: STAEformer: Spatio-Temporal Adaptive Embedding Makes Vanilla Transformer SOTA for Traffic Forecasting
-    Link: https://arxiv.org/abs/2308.10425
-    Official Code: https://github.com/XDZhelheim/STAEformer
-    Venue: CIKM 2023
-    Task: Spatial-Temporal Forecasting
+    这个模型基本上和STAEformer是一样的，但是把时空适应性嵌入变成了位置嵌入和相对时间嵌入
     """
     def __init__(
         self,
@@ -128,8 +124,7 @@ class STAEformer(nn.Module):
         input_embedding_dim=24,
         tod_embedding_dim=24,
         dow_embedding_dim=24,
-        spatial_embedding_dim=0,
-        adaptive_embedding_dim=80,
+        spatial_embedding_dim=80,
         feed_forward_dim=256,
         num_heads=4,
         num_layers=3,
@@ -149,13 +144,12 @@ class STAEformer(nn.Module):
         self.tod_embedding_dim = tod_embedding_dim
         self.dow_embedding_dim = dow_embedding_dim
         self.spatial_embedding_dim = spatial_embedding_dim
-        self.adaptive_embedding_dim = adaptive_embedding_dim
+        self.index_embedding_dim = spatial_embedding_dim
         self.model_dim = (
             input_embedding_dim
             + tod_embedding_dim
             + dow_embedding_dim
             + spatial_embedding_dim
-            + adaptive_embedding_dim
         )
         self.num_heads = num_heads
         self.num_layers = num_layers
@@ -174,11 +168,10 @@ class STAEformer(nn.Module):
                 torch.empty(self.num_nodes, self.spatial_embedding_dim)
             )
             nn.init.xavier_uniform_(self.node_emb)
-        if adaptive_embedding_dim > 0:
-            # note (in_steps, nodes, d_a)
-            self.adaptive_embedding = nn.init.xavier_uniform_(
-                nn.Parameter(torch.empty(in_steps, num_nodes, adaptive_embedding_dim))
+            self.index_emb = nn.Parameter(
+                torch.empty(1, self.in_steps, 1, self.index_embedding_dim)
             )
+            nn.init.xavier_uniform_(self.index_emb)
         # note 回归头
         if use_mixed_proj:
             self.output_proj = nn.Linear(
@@ -207,7 +200,7 @@ class STAEformer(nn.Module):
         # x: (batch_size, in_steps, num_nodes, input_dim+tod+dow=3)
         x = history_data
         batch_size = x.shape[0]
-
+        num_nodes = history_data.shape[2]
         if self.tod_embedding_dim > 0:
             tod = x[..., 1] * self.steps_per_day
         if self.dow_embedding_dim > 0:
@@ -230,12 +223,10 @@ class STAEformer(nn.Module):
             spatial_emb = self.node_emb.expand(
                 batch_size, self.in_steps, *self.node_emb.shape
             )
-            features.append(spatial_emb)
-        if self.adaptive_embedding_dim > 0:
-            adp_emb = self.adaptive_embedding.expand(
-                size=(batch_size, *self.adaptive_embedding.shape)
+            index_emb = self.index_emb.expand(
+                batch_size, -1, self.num_nodes, -1
             )
-            features.append(adp_emb)
+            features.append(spatial_emb + index_emb)
         x = torch.cat(features, dim=-1)  # (batch_size, in_steps, num_nodes, model_dim)
 
         for attn in self.attn_layers_t:

@@ -74,7 +74,7 @@ class GraphWaveNet(nn.Module):
                  gcn_bool=True, addaptadj=True, aptinit=None,
                  in_dim=2, out_dim=12, residual_channels=32,
                  dilation_channels=32, skip_channels=256, end_channels=512,
-                 kernel_size=2, blocks=4, layers=2,
+                 kernel_size=2, blocks=4, layers=2, dilation: int = 2,
                  ssl_name: str = None, ssl_loss_weight: float = None, **kwargs
                  ):
         super(GraphWaveNet, self).__init__()
@@ -144,9 +144,9 @@ class GraphWaveNet(nn.Module):
                                                  out_channels=skip_channels,
                                                  kernel_size=(1, 1)))
                 self.bn.append(nn.BatchNorm2d(residual_channels))
-                new_dilation *= 2
+                new_dilation *= dilation
                 receptive_field += additional_scope
-                additional_scope *= 2
+                additional_scope *= dilation
                 if self.gcn_bool:
                     self.gconv.append(
                         gcn(dilation_channels, residual_channels, dropout, support_len=self.supports_len))

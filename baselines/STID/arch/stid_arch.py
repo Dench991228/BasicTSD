@@ -68,7 +68,7 @@ class STID(nn.Module):
 
     def forward(self, history_data: torch.Tensor, future_data: torch.Tensor,
                 batch_seen: int, epoch: int, train: bool,
-                return_repr: bool, **kwargs) -> torch.Tensor|Dict:
+                return_repr: bool = False, **kwargs) -> torch.Tensor|Dict:
         """Feed forward of STID.
 
         Args:
@@ -118,7 +118,7 @@ class STID(nn.Module):
 
         # encoding
         hidden = self.encoder(hidden)
-        print(hidden.shape)
+        # print(hidden.shape)
         repr = hidden[:, :, :, 0].permute(0, 2, 1).contiguous()
         # regression
         # (B, Feature, N, 1) -> (B, Feature, N, out_len)
