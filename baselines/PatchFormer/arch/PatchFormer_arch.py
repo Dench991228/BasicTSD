@@ -1,115 +1,12 @@
 from typing import Dict
 
-import torch.nn as nn
 import torch
+from torch import nn as nn
+
+from baselines.MyModel.arch.PatchFormer import SelfAttentionLayer
 
 
-class AttentionLayer(nn.Module):
-    """Perform attention across the -2 dim (the -1 dim is `model_dim`).
-
-    Make sure the tensor is permuted to correct shape before attention.
-
-    E.g.
-    - Input shape (batch_size, in_steps, num_nodes, model_dim).
-    - Then the attention will be performed across the nodes.
-
-    Also, it supports different src and tgt length.
-
-    But must `src length == K length == V length`.
-
-    """
-
-    def __init__(self, model_dim, num_heads=8, mask=False):
-        super().__init__()
-
-        self.model_dim = model_dim
-        self.num_heads = num_heads
-        self.mask = mask
-
-        self.head_dim = model_dim // num_heads
-
-        self.FC_Q = nn.Linear(model_dim, model_dim)
-        self.FC_K = nn.Linear(model_dim, model_dim)
-        self.FC_V = nn.Linear(model_dim, model_dim)
-
-        self.out_proj = nn.Linear(model_dim, model_dim)
-
-    def forward(self, query, key, value):
-        # Q    (batch_size, ..., tgt_length, model_dim)
-        # K, V (batch_size, ..., src_length, model_dim)
-        batch_size = query.shape[0]
-        tgt_length = query.shape[-2]
-        src_length = key.shape[-2]
-
-        query = self.FC_Q(query)
-        key = self.FC_K(key)
-        value = self.FC_V(value)
-
-        # Qhead, Khead, Vhead (num_heads * batch_size, ..., length, head_dim)
-        query = torch.cat(torch.split(query, self.head_dim, dim=-1), dim=0)
-        key = torch.cat(torch.split(key, self.head_dim, dim=-1), dim=0)
-        value = torch.cat(torch.split(value, self.head_dim, dim=-1), dim=0)
-
-        key = key.transpose(
-            -1, -2
-        )  # (num_heads * batch_size, ..., head_dim, src_length)
-
-        attn_score = (
-            query @ key
-        ) / self.head_dim**0.5  # (num_heads * batch_size, ..., tgt_length, src_length)
-
-        if self.mask:
-            mask = torch.ones(
-                tgt_length, src_length, dtype=torch.bool, device=query.device
-            ).tril()  # lower triangular part of the matrix
-            attn_score.masked_fill_(~mask, -torch.inf)  # fill in-place
-
-        attn_score = torch.softmax(attn_score, dim=-1)
-        out = attn_score @ value  # (num_heads * batch_size, ..., tgt_length, head_dim)
-        out = torch.cat(
-            torch.split(out, batch_size, dim=0), dim=-1
-        )  # (batch_size, ..., tgt_length, head_dim * num_heads = model_dim)
-
-        out = self.out_proj(out)
-
-        return out
-
-
-class SelfAttentionLayer(nn.Module):
-    def __init__(
-        self, model_dim, feed_forward_dim=2048, num_heads=8, dropout=0, mask=False
-    ):
-        super().__init__()
-
-        self.attn = AttentionLayer(model_dim, num_heads, mask)
-        self.feed_forward = nn.Sequential(
-            nn.Linear(model_dim, feed_forward_dim),
-            nn.ReLU(inplace=True),
-            nn.Linear(feed_forward_dim, model_dim),
-        )
-        self.ln1 = nn.LayerNorm(model_dim)
-        self.ln2 = nn.LayerNorm(model_dim)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-
-    def forward(self, x, dim=-2):
-        x = x.transpose(dim, -2)
-        # x: (batch_size, ..., length, model_dim)
-        residual = x
-        out = self.attn(x, x, x)  # (batch_size, ..., length, model_dim)
-        out = self.dropout1(out)
-        out = self.ln1(residual + out)
-
-        residual = out
-        out = self.feed_forward(out)  # (batch_size, ..., length, model_dim)
-        out = self.dropout2(out)
-        out = self.ln2(residual + out)
-
-        out = out.transpose(dim, -2)
-        return out
-
-
-class STAEformer(nn.Module):
+class PatchFormer_base(nn.Module):
     """
     Paper: STAEformer: Spatio-Temporal Adaptive Embedding Makes Vanilla Transformer SOTA for Traffic Forecasting
     Link: https://arxiv.org/abs/2308.10425
@@ -135,6 +32,9 @@ class STAEformer(nn.Module):
         num_layers=3,
         dropout=0.1,
         use_mixed_proj=True,
+        patch_size: int = 6,
+        stride: int = 3,
+        hidden_dim: int = 128,
         **kwargs
     ):
         super().__init__()
@@ -160,6 +60,7 @@ class STAEformer(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.use_mixed_proj = use_mixed_proj
+        self.hidden_dim = hidden_dim
         # note 嵌入的部分
         self.input_proj = nn.Linear(input_dim, input_embedding_dim)
         if tod_embedding_dim > 0:
@@ -179,10 +80,15 @@ class STAEformer(nn.Module):
             self.adaptive_embedding = nn.init.xavier_uniform_(
                 nn.Parameter(torch.empty(in_steps, num_nodes, adaptive_embedding_dim))
             )
+        # note patching的部分
+        self.patch_size = patch_size
+        self.stride = stride
+        self.patching_layer = nn.Linear(self.patch_size * self.model_dim, self.hidden_dim)
+        self.count_patches = (in_steps - patch_size) // stride + 1
         # note 回归头
         if use_mixed_proj:
             self.output_proj = nn.Linear(
-                in_steps * self.model_dim, out_steps * output_dim
+                self.count_patches * self.hidden_dim, out_steps * output_dim
             )
         else:
             self.temporal_proj = nn.Linear(in_steps, out_steps)
@@ -190,14 +96,14 @@ class STAEformer(nn.Module):
 
         self.attn_layers_t = nn.ModuleList(
             [
-                SelfAttentionLayer(self.model_dim, feed_forward_dim, num_heads, dropout)
+                SelfAttentionLayer(self.hidden_dim, feed_forward_dim, num_heads, dropout)
                 for _ in range(num_layers)
             ]
         )
 
         self.attn_layers_s = nn.ModuleList(
             [
-                SelfAttentionLayer(self.model_dim, feed_forward_dim, num_heads, dropout)
+                SelfAttentionLayer(self.hidden_dim, feed_forward_dim, num_heads, dropout)
                 for _ in range(num_layers)
             ]
         )
@@ -236,22 +142,32 @@ class STAEformer(nn.Module):
                 size=(batch_size, *self.adaptive_embedding.shape)
             )
             features.append(adp_emb)
-        x = torch.cat(features, dim=-1)  # (batch_size, in_steps, num_nodes, model_dim)
-
+        # note 最终的嵌入层输出
+        # (batch_size, in_steps, num_nodes, model_dim)
+        x = torch.cat(features, dim=-1)
+        # note 这里进行patching
+        # (batch_size, num_nodes, in_steps, model_dim) -> (bs, num_nodes, count_p, p_size, model_dim)
+        x = torch.transpose(x, 1, 2)
+        x = x.unfold(-2, self.patch_size, self.stride)
+        bs, nodes, count_p, p_size, model_dim = x.shape
+        x = x.reshape(bs, nodes, count_p, -1)
+        # (bs, num_nodes, count_p, hidden_dim)
+        x = self.patching_layer(x)
+        # (bs, count_p, num_nodes, hidden_dim)
+        x = x.transpose(1, 2).contiguous()
+        # note 进行自注意力变换
         for attn in self.attn_layers_t:
             x = attn(x, dim=1)
-        for attn in self.attn_layers_s:
-            x = attn(x, dim=2)
-        # (batch_size, in_steps, num_nodes, model_dim)
+        # (batch_size, in_steps, num_nodes, hidden_dim)
         # note 这里才是需要输出的地方
-        # (batch_size, num_nodes, in_steps, model_dim)
+        # (batch_size, num_nodes, in_steps, hidden_dim)
         repr = x.transpose(1, 2)
-        repr = repr.reshape(batch_size, -1, self.model_dim * self.in_steps)
+        repr = repr.reshape(batch_size, -1, self.hidden_dim * self.count_patches)
         # print(repr.shape)
         if self.use_mixed_proj:
-            out = x.transpose(1, 2)  # (batch_size, num_nodes, in_steps, model_dim)
+            out = x.transpose(1, 2)  # (batch_size, num_nodes, in_steps, hidden_dim)
             out = out.reshape(
-                batch_size, self.num_nodes, self.in_steps * self.model_dim
+                batch_size, self.num_nodes, self.hidden_dim * self.count_patches
             )
             out = self.output_proj(out).view(
                 batch_size, self.num_nodes, self.out_steps, self.output_dim
@@ -272,13 +188,3 @@ class STAEformer(nn.Module):
                 "prediction": out,
                 "representation": repr,
             }
-
-    def get_spatial_embeddings(self) -> torch.Tensor:
-        """
-        返回当前模型的空间编码，优先是adaptive embedding
-        """
-        spatial_embeddings = self.adaptive_embedding.clone().detach()
-        spatial_embeddings.requires_grad = False
-        spatial_embeddings = spatial_embeddings.transpose(0, 1).contiguous()
-        spatial_embeddings = spatial_embeddings.reshape(self.num_nodes, -1)
-        return spatial_embeddings

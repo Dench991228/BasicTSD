@@ -68,7 +68,10 @@ def visualize_amplitude_change(file_dir: str, sensor_id: int = 0):
 def visualize_prediction(file_dir: str,
                          sensor_id: int = 0,
                          horizon: int = 11,
-                         mode: str = "overall"):
+                         mode: str = "overall",
+                         show_error: bool = False,
+                         max_steps: int = 500,
+                         y_axis_name="loss"):
     result_dict = read_result_file(file_dir)
     if mode == "trend":
         data = result_dict['target_trend'][:, horizon, sensor_id, 0]
@@ -83,15 +86,29 @@ def visualize_prediction(file_dir: str,
         data = result_dict['target'][:, horizon, sensor_id, 0] - result_dict['target_trend'][:, horizon, sensor_id, 0]
         pred = result_dict['prediction'][:, horizon, sensor_id, 0] - result_dict['prediction_trend'][:, horizon, sensor_id, 0]
     x = np.arange(data.shape[0])
+    error = np.abs(data - pred)
+    if x.shape[0] > max_steps:
+        x = x[:max_steps]
+        data = data[:max_steps]
+        pred = pred[:max_steps]
+        error = error[:max_steps]
     # 输出位置
     fig_dir = os.path.join(os.path.dirname(file_dir), "visualize_result")
     os.makedirs(fig_dir, exist_ok=True)
     # 开始绘图
-    plot_line(base_folder=fig_dir,
-              title=f"Visualization of Sensor {sensor_id} on Horizon {horizon+1} {mode}",
-              x=x, ys=[data, pred, np.abs(data-pred)], y_names=["Label", 'Prediction', 'error'],
-              x_axis_name="time steps", y_axis_name="value",
-              )
+    if show_error:
+        plot_line(base_folder=fig_dir,
+                  title=f"Visualization of Sensor {sensor_id} on Horizon {horizon+1} {mode}",
+                  x=x, ys=[data, pred, error], y_names=["Label", 'Prediction', 'error'],
+                  x_axis_name="time steps", y_axis_name=y_axis_name,
+                  )
+    else:
+        plot_line(base_folder=fig_dir,
+                  title=f"Visualization of Sensor {sensor_id} on Horizon {horizon+1} {mode}",
+                  x=x, ys=[data, pred], y_names=["Label", 'Prediction'],
+                  x_axis_name="time steps", y_axis_name=y_axis_name,
+                  )
+
 
 def visualize_mean_prediction(file_dir: str,
                               sensor_id: int = 0,

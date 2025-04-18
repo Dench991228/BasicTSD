@@ -352,7 +352,9 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
                 loss += loss_item['loss'] * loss_item['weight']
                 print(loss, loss_item['weight'] * loss_item['loss'])
                 ln = loss_item['loss_name']
-                # self.update_epoch_meter(f'train/{ln}', loss_item['loss'].item())
+                if f"train/{ln}" not in self.meter_pool._pool:
+                    self.register_epoch_meter(f"train/{ln}", "train")
+                self.update_epoch_meter(f'train/{ln}', loss_item['loss'].item())
         for metric_name, metric_func in self.metrics.items():
             metric_item = self.metric_forward(metric_func, forward_return)
             self.update_epoch_meter(f'train/{metric_name}', metric_item.item())
@@ -369,6 +371,14 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         forward_return = self.forward(data=data, epoch=None, iter_num=iter_index, train=False)
         loss = self.metric_forward(self.loss, forward_return)
         self.update_epoch_meter('val/loss', loss.item())
+        if "other_losses" in forward_return:
+            for loss_item in forward_return['other_losses']:
+                # loss += loss_item['loss'] * loss_item['weight']
+                # print(loss, loss_item['weight'] * loss_item['loss'])
+                ln = loss_item['loss_name']
+                if f"val/{ln}" not in self.meter_pool._pool:
+                    self.register_epoch_meter(f"val/{ln}", "val")
+                self.update_epoch_meter(f'val/{ln}', loss_item['loss'].item())
 
         for metric_name, metric_func in self.metrics.items():
             metric_item = self.metric_forward(metric_func, forward_return)
@@ -425,6 +435,12 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
 
             loss = self.metric_forward(self.loss, forward_return)
             self.update_epoch_meter('test/loss', loss.item())
+            if "other_losses" in forward_return:
+                for loss_item in forward_return['other_losses']:
+                    ln = loss_item['loss_name']
+                    if f"test/{ln}" not in self.meter_pool._pool:
+                        self.register_epoch_meter(f"test/{ln}", "test")
+                    self.update_epoch_meter(f'test/{ln}', loss_item['loss'].item())
 
             if not self.if_evaluate_on_gpu:
                 forward_return['prediction'] = forward_return['prediction'].detach().cpu()

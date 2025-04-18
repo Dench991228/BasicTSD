@@ -44,7 +44,7 @@ class DCGRUCell(torch.nn.Module):
 
     def __init__(self, num_units, adj_mx, max_diffusion_step, num_nodes, nonlinearity='tanh', use_gc_for_ru=True):
         super().__init__()
-        self._activation = torch.tanh if nonlinearity == 'tanh' else torch.relu
+        self._activation = torch.tanh if nonlinearity == 'tanh' else torch
         # support other nonlinearities up here?
         self._num_nodes = num_nodes
         self._num_units = num_units

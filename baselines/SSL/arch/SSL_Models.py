@@ -6,7 +6,9 @@ from baselines.MyModel.arch.DecomposeFormer import DecomposeFormer
 from baselines.MyModel.arch.DecomposeFormer_tts import DecomposeFormer_TTS
 from baselines.SSL.arch.PatchPerm import PatchPermAugmentation
 from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub, SoftCLT_Loss_Graph, \
-    SoftCLT_Loss_Graph_Relative, SoftCLT_Loss_Graph_Relative_R
+    SoftCLT_Loss_Graph_Relative, SoftCLT_Loss_Graph_Relative_R, SoftCLT_Spatial_Loss
+from baselines.SSL.arch.s_contrast import ClusterContrast
+from baselines.SSL.arch.t_global_contrast import TGlobalContrast, TGlobalContrast_better
 from baselines.STAEformer.arch.staeformer_arch import STAEformer
 from baselines.STID.arch.stid_arch import STID
 
@@ -87,9 +89,21 @@ class STAEformer_SSL(STAEformer):
                 print("softclt_sub")
                 self.ssl_module = SoftCLT_Loss_Sub(**kwargs)
                 self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "softclt_spatial":
+                self.ssl_module = SoftCLT_Spatial_Loss(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "c_contrast":
+                self.ssl_module = ClusterContrast(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "t_global_contrast":
+                self.ssl_module = TGlobalContrast(**kwargs)
+            elif ssl_name == "t_global_contrast_better":
+                self.ssl_module = TGlobalContrast_better(**kwargs)
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
                                                hard=kwargs["hard"])
+        self.ssl_module.ssl_loss_weight = ssl_loss_weight
+        self.ssl_module.ssl_metric_name = ssl_name
         self.use_future = kwargs['ssl_use_future'] if 'ssl_use_future' in kwargs else False
 
     def _forward(self, history_data: torch.Tensor, future_data: torch.Tensor,
@@ -104,7 +118,7 @@ class STAEformer_SSL(STAEformer):
         # prediction: 预测结果，repr (B, node, dim)
         original_forward_output =  self._forward(history_data, future_data, batch_seen, epoch, train, True)
         # note 考虑和对比损失有关的内容
-        if self.ssl_metric_name is not None:
+        if self.ssl_metric_name is not None and 't_global' not in self.ssl_metric_name:
             # 先数据增强, 先交换，再增加高斯噪声
             augmented_data = self.ppa_aug(history_data)
             rand_noise = torch.randn_like(augmented_data[:, :, :, 0]).cuda()*0.01
@@ -114,8 +128,9 @@ class STAEformer_SSL(STAEformer):
             if not self.use_future:
                 ssl_loss = self.ssl_module(original_forward_output["representation"],
                                 augmented_forward_output["representation"],
-                                history_data[:, :, :, 0],
-                                augmented_data[:, :, :, 0]
+                                original_series=history_data[:, :, :, 0],
+                                augmented_series=augmented_data[:, :, :, 0],
+                                spatial_embeddings=self.get_spatial_embeddings()
                                 )
             else:
                 print("use future!")
@@ -124,10 +139,14 @@ class STAEformer_SSL(STAEformer):
                                 future_data[:, :, :, 0],
                                 augmented_data[:, :, :, 0]
                             )
+            original_forward_output['other_losses'] = ssl_loss
+        elif 't_global' in self.ssl_metric_name:
+            model_repr = original_forward_output["representation"]
+            contrastive_loss = self.ssl_module(model_repr)
             original_forward_output['other_losses'] = [
                 {
                     "weight": self.ssl_loss_weight,
-                    "loss": ssl_loss,
+                    "loss": contrastive_loss,
                     "loss_name": self.ssl_metric_name
                 }
             ]
@@ -222,6 +241,7 @@ class DecomposeFormer_TTS_SSL(DecomposeFormer_TTS):
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
                                                hard=kwargs["hard"])
+        self.ssl_module.ssl_loss_weight = ssl_loss_weight
         self.use_future = kwargs['ssl_use_future'] if 'ssl_use_future' in kwargs else False
         self.use_aug = kwargs["use_aug"] if "use_aug" in kwargs else True
 
@@ -269,13 +289,7 @@ class DecomposeFormer_TTS_SSL(DecomposeFormer_TTS):
                                 future_data[:, :, :, 0],
                                 augmented_data[:, :, :, 0]
                             )
-            original_forward_output['other_losses'] = [
-                {
-                    "weight": self.ssl_loss_weight,
-                    "loss": ssl_loss,
-                    "loss_name": self.ssl_metric_name
-                }
-            ]
+            original_forward_output['other_losses'] = ssl_loss
         if not return_repr:
             del original_forward_output['representation']
         return original_forward_output
