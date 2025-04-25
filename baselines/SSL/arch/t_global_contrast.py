@@ -92,3 +92,26 @@ class TGlobalContrast_better(nn.Module):
         labels = labels.reshape(bs * num_nodes)
         loss = self.criteria(score, labels)
         return loss
+
+class TGlobalContrast_better_mapper(nn.Module):
+    def __init__(self, repr_dim, hidden_dim=128, tau=0.2,**kwargs):
+        super(TGlobalContrast_better_mapper, self).__init__()
+        # note 用来做线性变换的地方
+        self.net1 = nn.Sequential(
+            nn.Linear(repr_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+        self.net2 = nn.Sequential(
+            nn.Linear(repr_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+        self.sigmoid = nn.Sigmoid()
+        self.criteria = nn.CrossEntropyLoss()
+        for m in self.modules():
+            self.weights_init(m)
+        self.hidden_dim = hidden_dim
+        self.tau = tau

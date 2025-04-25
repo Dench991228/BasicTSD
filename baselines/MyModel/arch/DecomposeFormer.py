@@ -302,8 +302,11 @@ class DecomposeFormer(nn.Module):
 
         # note 回归头
         if use_mixed_proj:
-            self.output_proj = nn.Linear(
-                in_steps * self.model_dim * 2, out_steps * output_dim
+            self.output_proj_trend = nn.Linear(
+                in_steps * self.model_dim, out_steps * output_dim
+            )
+            self.output_proj_seasonal = nn.Linear(
+                in_steps * self.model_dim, out_steps * output_dim
             )
         else:
             self.temporal_proj = nn.Linear(in_steps, out_steps)
@@ -341,7 +344,7 @@ class DecomposeFormer(nn.Module):
             x = attn(x)
         # (bs, T, num_nodes, 2, model_dim)
         #print("after deep", x.shape)
-        x = x.reshape(batch_size, self.in_steps, self.num_nodes, self.model_dim*2)
+        # x = x.reshape(batch_size, self.in_steps, self.num_nodes, self.model_dim*2)
         # (batch_size, in_steps, num_nodes, model_dim)
         # note 这里才是需要输出的地方
         # (batch_size, num_nodes, in_steps, model_dim)
@@ -349,14 +352,14 @@ class DecomposeFormer(nn.Module):
         repr = repr.reshape(batch_size, -1, self.model_dim * self.in_steps * 2)
         #print(repr.shape)
         if self.use_mixed_proj:
-            out = x.transpose(1, 2)  # (batch_size, num_nodes, in_steps, model_dim)
-            out = out.reshape(
-                batch_size, self.num_nodes, self.in_steps * self.model_dim*2
-            )
-            out = self.output_proj(out).view(
+            out = x.transpose(1, 2)  # (batch_size, num_nodes, in_steps, 2, model_dim)
+            out_trend = self.output_proj(out[:, :, :, 0, :]).view(
                 batch_size, self.num_nodes, self.out_steps, self.output_dim
-            )
-            out = out.transpose(1, 2)  # (batch_size, out_steps, num_nodes, output_dim)
+            ).transpose(1, 2)
+            out_seasonal = self.output_proj_seasonal(out[:, :, :, 1, :]).view(
+                batch_size, self.num_nodes, self.out_steps, self.output_dim
+            ).transpose(1, 2)
+            out = out_trend + out_seasonal  # (batch_size, out_steps, num_nodes, output_dim)
         else:
             out = x.transpose(1, 3)  # (batch_size, model_dim, num_nodes, in_steps)
             out = self.temporal_proj(
@@ -365,10 +368,19 @@ class DecomposeFormer(nn.Module):
             out = self.output_proj(
                 out.transpose(1, 3)
             )  # (batch_size, out_steps, num_nodes, output_dim)
+        future_trend = self.decomposer(future_data[:, :, :, 0]).unsqueeze(-1)
         if not return_repr:
-            return out
+            return {
+                "prediction": out,
+                "input_trend": trend_components[:, :, :, :1],
+                "prediction_trend": out_trend,
+                "target_trend": future_trend,
+            }
         else:
             return {
                 "prediction": out,
                 "representation": repr,
+                "input_trend": trend_components[:, :, :, :1],
+                "prediction_trend": out_trend,
+                "target_trend": future_trend,
             }

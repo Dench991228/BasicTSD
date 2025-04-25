@@ -71,7 +71,8 @@ class MyFormer(nn.Module):
         )
         self.output_dim = output_dim
         self.out_steps = out_steps
-        self.regression_head = nn.Linear(self.trend_branch.model_dim * 2 * in_steps, out_steps * output_dim)
+        self.regression_head_trend = nn.Linear(self.trend_branch.model_dim * in_steps, out_steps * output_dim)
+        self.regression_head_seasonal = nn.Linear(self.trend_branch.model_dim * in_steps, out_steps * output_dim)
         self.decomposer = moving_avg(kernel_size=3, stride=1)
 
     def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int,
@@ -91,25 +92,36 @@ class MyFormer(nn.Module):
                                        future_data=future_data,
                                        batch_seen=batch_seen,
                                        epoch=epoch,
-                                       return_repr=return_repr,
+                                       return_repr=True,
                                        train=train,
                                        **kwargs)['representation']
         seasonal_repr = self.seasonal_branch(history_data=seasonal_components,
                                              future_data=future_data,
                                              batch_seen=batch_seen,
                                              epoch=epoch,
-                                             return_repr=return_repr,
+                                             return_repr=True,
                                              train=train,
                                              **kwargs)['representation']
         bs, num_nodes, _ = trend_repr.shape
         # (bs, num_node, in_steps * model_dim * 2) -> (bs, num_node, out_steps * output_dim)
         final_repr = torch.cat([trend_repr, seasonal_repr], dim=-1)
-        output = self.regression_head(final_repr)
-        output = output.reshape(bs, self.out_steps, num_nodes, self.output_dim)
+        output_trend = self.regression_head_trend(trend_repr).transpose(-1, -2).unsqueeze(-1)
+        output_seasonal = self.regression_head_seasonal(seasonal_repr).transpose(-1, -2).unsqueeze(-1)
+        output = output_trend + output_seasonal
+        print(output.shape)
+        future_trend = self.decomposer(future_data[:, :, :, 0])
         if return_repr:
             return {
                 "prediction": output,
                 "representation": final_repr,
+                "input_trend": trend_components[:, :, :, :1],
+                "target_trend": future_trend.unsqueeze(-1),
+                "prediction_trend": output_trend,
             }
         else:
-            return output
+            return {
+                "prediction": output,
+                "input_trend": trend_components[:, :, :, :1],
+                "target_trend": future_trend.unsqueeze(-1),
+                "prediction_trend": output_trend,
+            }

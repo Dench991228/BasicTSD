@@ -19,7 +19,7 @@ from .arch import GraphWaveNet
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
-DATA_NAME = 'PEMS04'  # Dataset name
+DATA_NAME = 'PEMS08'  # Dataset name
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # Length of input sequence
 OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # Length of output sequence
@@ -32,7 +32,7 @@ MODEL_ARCH = GraphWaveNet
 adj_mx, _ = load_adj("datasets/" + DATA_NAME +
                      "/adj_mx.pkl", "doubletransition")
 MODEL_PARAM = {
-    "num_nodes": 307,
+    "num_nodes": 170,
     "supports": [torch.tensor(i) for i in adj_mx],
     "dropout": 0.3,
     "gcn_bool": True,
@@ -50,7 +50,8 @@ MODEL_PARAM = {
     "ssl_name": "softclt",
     "ssl_loss_weight": 1,
     "alpha": 1.0,
-    "tau": 1.0
+    "tau": 1.0,
+    "hard": True
 }
 NUM_EPOCHS = 100
 

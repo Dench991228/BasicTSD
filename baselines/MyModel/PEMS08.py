@@ -4,6 +4,7 @@ import torch
 from easydict import EasyDict
 
 from .arch.MyFormer import MyFormer
+from .loss import NewDecomposeFormerLoss
 
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
 
@@ -108,7 +109,7 @@ CFG.TRAIN.CKPT_SAVE_DIR = os.path.join(
     MODEL_ARCH.__name__,
     '_'.join([DATA_NAME, str(CFG.TRAIN.NUM_EPOCHS), str(INPUT_LEN), str(OUTPUT_LEN)])
 )
-CFG.TRAIN.LOSS = masked_mae
+CFG.TRAIN.LOSS = NewDecomposeFormerLoss
 # Optimizer settings
 CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"

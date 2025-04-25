@@ -5,8 +5,10 @@ import torch
 from baselines.MyModel.arch.DecomposeFormer import DecomposeFormer
 from baselines.MyModel.arch.DecomposeFormer_tts import DecomposeFormer_TTS
 from baselines.SSL.arch.PatchPerm import PatchPermAugmentation
-from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub, SoftCLT_Loss_Graph, \
-    SoftCLT_Loss_Graph_Relative, SoftCLT_Loss_Graph_Relative_R, SoftCLT_Spatial_Loss
+from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub
+from baselines.SSL.arch.SoftCLT_spatial_loss import SoftCLT_Spatial_Loss, SoftCLT_Loss_Graph, \
+    SoftCLT_Loss_Graph_Relative, SoftCLT_Loss_Graph_Relative_R
+from baselines.SSL.arch.SoftCLT_temporal_loss import SoftCLTLoss_t, SoftCLTLoss_global_t
 from baselines.SSL.arch.s_contrast import ClusterContrast
 from baselines.SSL.arch.t_global_contrast import TGlobalContrast, TGlobalContrast_better
 from baselines.STAEformer.arch.staeformer_arch import STAEformer
@@ -92,12 +94,20 @@ class STAEformer_SSL(STAEformer):
             elif ssl_name == "softclt_spatial":
                 self.ssl_module = SoftCLT_Spatial_Loss(**kwargs)
                 self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "softclt_temporal":
+                self.ssl_module = SoftCLTLoss_t(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
+            elif ssl_name == "softclt_temporal_global_t":
+                self.ssl_module = SoftCLTLoss_global_t(**kwargs)
+                self.ppa_aug = PatchPermAugmentation()
             elif ssl_name == "c_contrast":
                 self.ssl_module = ClusterContrast(**kwargs)
                 self.ppa_aug = PatchPermAugmentation()
             elif ssl_name == "t_global_contrast":
                 self.ssl_module = TGlobalContrast(**kwargs)
             elif ssl_name == "t_global_contrast_better":
+                self.ssl_module = TGlobalContrast_better(**kwargs)
+            elif ssl_name == "t_global_contrast_better_mapper":
                 self.ssl_module = TGlobalContrast_better(**kwargs)
             else:
                 self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
@@ -123,6 +133,8 @@ class STAEformer_SSL(STAEformer):
             augmented_data = self.ppa_aug(history_data)
             rand_noise = torch.randn_like(augmented_data[:, :, :, 0]).cuda()*0.01
             augmented_data[:, :, :, 0] += rand_noise
+            # (B)
+            tod = history_data[:, -1, 0, 1]
             # 之后再收集对比学习部分的损失
             augmented_forward_output = self._forward(augmented_data, future_data, batch_seen, epoch, train, True)
             if not self.use_future:
@@ -130,14 +142,16 @@ class STAEformer_SSL(STAEformer):
                                 augmented_forward_output["representation"],
                                 original_series=history_data[:, :, :, 0],
                                 augmented_series=augmented_data[:, :, :, 0],
-                                spatial_embeddings=self.get_spatial_embeddings()
+                                spatial_embeddings=self.get_spatial_embeddings(),
+                                tod=tod
                                 )
             else:
                 print("use future!")
                 ssl_loss = self.ssl_module(original_forward_output["representation"],
                                 augmented_forward_output["representation"],
                                 future_data[:, :, :, 0],
-                                augmented_data[:, :, :, 0]
+                                augmented_data[:, :, :, 0],
+                                tod=tod
                             )
             original_forward_output['other_losses'] = ssl_loss
         elif 't_global' in self.ssl_metric_name:
