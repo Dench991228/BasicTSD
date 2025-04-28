@@ -1,15 +1,21 @@
 import os
 import sys
+import torch
 from easydict import EasyDict
+
+from baselines.SSL.arch.ssl_model_wrapper import SSLWrapper
+from basicts.metrics.decentral_mae import masked_decentral_mae
+from basicts.metrics.spatial_corr import spatial_corr
+from basicts.metrics.trend_mae import masked_trend_mae
+
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
 
-from basicts.metrics import masked_mae, masked_mape, masked_rmse
+from basicts.metrics import masked_mae, masked_mape, masked_rmse, masked_corr
 from basicts.data import TimeSeriesForecastingDataset
 from basicts.runners import SimpleTimeSeriesForecastingRunner
 from basicts.scaler import ZScoreScaler
-from basicts.utils import get_regular_settings
+from basicts.utils import get_regular_settings, load_adj
 
-from .arch import AGCRN
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
@@ -22,17 +28,33 @@ NORM_EACH_CHANNEL = regular_settings['NORM_EACH_CHANNEL'] # Whether to normalize
 RESCALE = regular_settings['RESCALE'] # Whether to rescale the data
 NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 # Model architecture and parameters
-MODEL_ARCH = AGCRN
+MODEL_ARCH = SSLWrapper
+adj_mx, _ = load_adj("datasets/" + DATA_NAME +
+                     "/adj_mx.pkl", "doubletransition")
 MODEL_PARAM = {
-    "num_nodes" : 170,
-    "input_dim" : 1,
-    "rnn_units" : 64,
-    "output_dim": 1,
-    "horizon"   : OUTPUT_LEN,
-    "num_layers": 2,
-    "default_graph": True,
-    "embed_dim" : 10,
-    "cheb_k"    : 2
+    "num_nodes": 170,
+    "supports": [torch.tensor(i) for i in adj_mx],
+    "dropout": 0.3,
+    "gcn_bool": True,
+    "addaptadj": True,
+    "aptinit": None,
+    "in_dim": 2,
+    "out_dim": 12,
+    "residual_channels": 32,
+    "dilation_channels": 32,
+    "skip_channels": 256,
+    "end_channels": 512,
+    "kernel_size": 2,
+    "blocks": 4,
+    "layers": 2,
+    "ssl_name": "softclt_temporal",
+    "ssl_loss_weight": 1,
+    "alpha": 1.0,
+    "tau": 1.0,
+    "hard": False,
+    "model_name": "GWNet",
+    "similarity_metric": "mse",
+    "tod_adjust": True
 }
 NUM_EPOCHS = 100
 
@@ -74,7 +96,7 @@ CFG.MODEL = EasyDict()
 CFG.MODEL.NAME = MODEL_ARCH.__name__
 CFG.MODEL.ARCH = MODEL_ARCH
 CFG.MODEL.PARAM = MODEL_PARAM
-CFG.MODEL.FORWARD_FEATURES = [0]
+CFG.MODEL.FORWARD_FEATURES = [0, 1]
 CFG.MODEL.TARGET_FEATURES = [0]
 
 ############################## Metrics Configuration ##############################
@@ -85,7 +107,11 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAE': masked_mae,
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
-                            })
+                                'corr': masked_corr,
+                                "spatial_corr": spatial_corr,
+                                'trend_MAE': masked_trend_mae,
+                                'decentral_MAE': masked_decentral_mae
+})
 CFG.METRICS.TARGET = 'MAE'
 CFG.METRICS.NULL_VAL = NULL_VAL
 
@@ -100,29 +126,43 @@ CFG.TRAIN.CKPT_SAVE_DIR = os.path.join(
 CFG.TRAIN.LOSS = masked_mae
 # Optimizer settings
 CFG.TRAIN.OPTIM = EasyDict()
-CFG.TRAIN.OPTIM.TYPE = 'Adam'
-CFG.TRAIN.OPTIM.PARAM = {'lr': 0.003}
+CFG.TRAIN.OPTIM.TYPE = "Adam"
+CFG.TRAIN.OPTIM.PARAM = {
+    "lr": 0.002,
+    "weight_decay": 0.0001,
+}
+# Learning rate scheduler settings
+CFG.TRAIN.LR_SCHEDULER = EasyDict()
+CFG.TRAIN.LR_SCHEDULER.TYPE = "MultiStepLR"
+CFG.TRAIN.LR_SCHEDULER.PARAM = {
+    "milestones": [1, 50],
+    "gamma": 0.5
+}
 # Train data loader settings
 CFG.TRAIN.DATA = EasyDict()
 CFG.TRAIN.DATA.BATCH_SIZE = 16
 CFG.TRAIN.DATA.SHUFFLE = True
+# Gradient clipping settings
+CFG.TRAIN.CLIP_GRAD_PARAM = {
+    "max_norm": 5.0
+}
 
 ############################## Validation Configuration ##############################
 CFG.VAL = EasyDict()
 CFG.VAL.INTERVAL = 1
 CFG.VAL.DATA = EasyDict()
-CFG.VAL.DATA.BATCH_SIZE = 64
+CFG.VAL.DATA.BATCH_SIZE = 16
 
 ############################## Test Configuration ##############################
 CFG.TEST = EasyDict()
 CFG.TEST.INTERVAL = 1
 CFG.TEST.DATA = EasyDict()
-CFG.TEST.DATA.BATCH_SIZE = 64
+CFG.TEST.DATA.BATCH_SIZE = 16
 
 ############################## Evaluation Configuration ##############################
 
 CFG.EVAL = EasyDict()
 
 # Evaluation parameters
-CFG.EVAL.HORIZONS = [3, 6, 12] # Prediction horizons for evaluation. Default: []
+CFG.EVAL.HORIZONS = [i for i in range(1, 13)] # Prediction horizons for evaluation. Default: []
 CFG.EVAL.USE_GPU = True # Whether to use GPU for evaluation. Default: True

@@ -5,11 +5,12 @@ import torch
 from baselines.MyModel.arch.DecomposeFormer import DecomposeFormer
 from baselines.MyModel.arch.DecomposeFormer_tts import DecomposeFormer_TTS
 from baselines.SSL.arch.PatchPerm import PatchPermAugmentation
-from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub
+from baselines.SSL.arch.SoftCLT_loss import SoftCLT_Loss, SoftCLT_Loss_Sub, SoftCLTLoss_timestep
 from baselines.SSL.arch.SoftCLT_spatial_loss import SoftCLT_Spatial_Loss, SoftCLT_Loss_Graph, \
     SoftCLT_Loss_Graph_Relative, SoftCLT_Loss_Graph_Relative_R
-from baselines.SSL.arch.SoftCLT_temporal_loss import SoftCLTLoss_t, SoftCLTLoss_global_t
+from baselines.SSL.arch.SoftCLT_temporal_loss import SoftCLTLoss_t, SoftCLTLoss_global_t, SoftCLTLoss_tod
 from baselines.SSL.arch.s_contrast import ClusterContrast
+from baselines.SSL.arch.ssl_factrory import ssl_factory
 from baselines.SSL.arch.t_global_contrast import TGlobalContrast, TGlobalContrast_better
 from baselines.STAEformer.arch.staeformer_arch import STAEformer
 from baselines.STID.arch.stid_arch import STID
@@ -83,35 +84,7 @@ class STAEformer_SSL(STAEformer):
         ssl_loss_weight = kwargs['ssl_loss_weight']
         self.ssl_metric_name = ssl_name
         self.ssl_loss_weight = ssl_loss_weight
-        if ssl_name is not None:
-            if ssl_name == "softclt":
-                self.ssl_module = SoftCLT_Loss(**kwargs)
-                self.ppa_aug = PatchPermAugmentation()
-            elif ssl_name == "softclt_sub":
-                print("softclt_sub")
-                self.ssl_module = SoftCLT_Loss_Sub(**kwargs)
-                self.ppa_aug = PatchPermAugmentation()
-            elif ssl_name == "softclt_spatial":
-                self.ssl_module = SoftCLT_Spatial_Loss(**kwargs)
-                self.ppa_aug = PatchPermAugmentation()
-            elif ssl_name == "softclt_temporal":
-                self.ssl_module = SoftCLTLoss_t(**kwargs)
-                self.ppa_aug = PatchPermAugmentation()
-            elif ssl_name == "softclt_temporal_global_t":
-                self.ssl_module = SoftCLTLoss_global_t(**kwargs)
-                self.ppa_aug = PatchPermAugmentation()
-            elif ssl_name == "c_contrast":
-                self.ssl_module = ClusterContrast(**kwargs)
-                self.ppa_aug = PatchPermAugmentation()
-            elif ssl_name == "t_global_contrast":
-                self.ssl_module = TGlobalContrast(**kwargs)
-            elif ssl_name == "t_global_contrast_better":
-                self.ssl_module = TGlobalContrast_better(**kwargs)
-            elif ssl_name == "t_global_contrast_better_mapper":
-                self.ssl_module = TGlobalContrast_better(**kwargs)
-            else:
-                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
-                                               hard=kwargs["hard"])
+        self.ssl_module, self.ppa_aug = ssl_factory(ssl_name, **kwargs)
         self.ssl_module.ssl_loss_weight = ssl_loss_weight
         self.ssl_module.ssl_metric_name = ssl_name
         self.use_future = kwargs['ssl_use_future'] if 'ssl_use_future' in kwargs else False

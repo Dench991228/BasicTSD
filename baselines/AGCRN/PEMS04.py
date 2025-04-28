@@ -104,7 +104,7 @@ CFG.TRAIN.OPTIM.TYPE = 'Adam'
 CFG.TRAIN.OPTIM.PARAM = {'lr': 0.003}
 # Train data loader settings
 CFG.TRAIN.DATA = EasyDict()
-CFG.TRAIN.DATA.BATCH_SIZE = 64
+CFG.TRAIN.DATA.BATCH_SIZE = 16
 CFG.TRAIN.DATA.SHUFFLE = True
 
 ############################## Validation Configuration ##############################

@@ -165,16 +165,16 @@ class GraphWaveNet(nn.Module):
         # note 设置和自监督损失有关的内容
         self.ssl_metric_name = ssl_name
         self.ssl_loss_weight = ssl_loss_weight
-        if ssl_name is not None:
-            if ssl_name == "softclt":
-                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
-                                               hard=kwargs["hard"],)
-                self.ssl_module.ssl_loss_weight = ssl_loss_weight
-                self.ssl_module.ssl_metric_name = ssl_name
-                self.ppa_aug = PatchPermAugmentation()
-            else:
-                self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
-                                               hard=kwargs["hard"])
+        #if ssl_name is not None:
+            #if ssl_name == "softclt":
+                #self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
+                                               #hard=kwargs["hard"],)
+                #self.ssl_module.ssl_loss_weight = ssl_loss_weight
+                #self.ssl_module.ssl_metric_name = ssl_name
+                #self.ppa_aug = PatchPermAugmentation()
+            #else:
+                #self.ssl_module = SoftCLT_Loss(similarity_metric="mse", alpha=kwargs["alpha"],tau=kwargs["tau"],
+                                               #hard=kwargs["hard"])
 
     def _forward(self, history_data: torch.Tensor,
                 future_data: torch.Tensor,
@@ -280,18 +280,18 @@ class GraphWaveNet(nn.Module):
         # prediction: 预测结果，repr (B, node, dim)
         original_forward_output =  self._forward(history_data, future_data, batch_seen, epoch, train, return_repr=True)
         # note 考虑和对比损失有关的内容
-        if self.ssl_metric_name is not None:
+        #if self.ssl_metric_name is not None:
             # 先数据增强, 先交换，再增加高斯噪声
-            augmented_data = self.ppa_aug(history_data)
-            rand_noise = torch.randn_like(augmented_data).cuda()*0.01
-            augmented_data += rand_noise
+            #augmented_data = self.ppa_aug(history_data)
+            #rand_noise = torch.randn_like(augmented_data).cuda()*0.01
+            #augmented_data += rand_noise
             # 之后再收集对比学习部分的损失
-            augmented_forward_output = self._forward(augmented_data, future_data, batch_seen, epoch, train, return_repr=True)
-            print(original_forward_output["representation"].shape, augmented_forward_output["representation"].shape)
-            ssl_loss = self.ssl_module(original_forward_output["representation"],
-                            augmented_forward_output["representation"],
-                            history_data[:, :, :, 0],
-                            augmented_data[:, :, :, 0]
-                            )
-            original_forward_output['other_losses'] = ssl_loss
+            #augmented_forward_output = self._forward(augmented_data, future_data, batch_seen, epoch, train, return_repr=True)
+            #print(original_forward_output["representation"].shape, augmented_forward_output["representation"].shape)
+            #ssl_loss = self.ssl_module(original_forward_output["representation"],
+                            #augmented_forward_output["representation"],
+                            #history_data[:, :, :, 0],
+                            #augmented_data[:, :, :, 0]
+                            #)
+            #original_forward_output['other_losses'] = ssl_loss
         return original_forward_output

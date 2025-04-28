@@ -1,15 +1,20 @@
 import os
 import sys
+import torch
 from easydict import EasyDict
+
+from baselines.SSL.arch.ssl_model_wrapper import SSLWrapper
+from baselines.STID.arch import STID
+from basicts.metrics.spatial_corr import spatial_corr
+from basicts.metrics.trend_mae import masked_trend_mae
+
 sys.path.append(os.path.abspath(__file__ + '/../../..'))
 
 from basicts.metrics import masked_mae, masked_mape, masked_rmse
 from basicts.data import TimeSeriesForecastingDataset
 from basicts.runners import SimpleTimeSeriesForecastingRunner
 from basicts.scaler import ZScoreScaler
-from basicts.utils import get_regular_settings
-
-from .arch import AGCRN
+from basicts.utils import get_regular_settings, load_adj
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
@@ -22,17 +27,28 @@ NORM_EACH_CHANNEL = regular_settings['NORM_EACH_CHANNEL'] # Whether to normalize
 RESCALE = regular_settings['RESCALE'] # Whether to rescale the data
 NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 # Model architecture and parameters
-MODEL_ARCH = AGCRN
+MODEL_ARCH = SSLWrapper
 MODEL_PARAM = {
-    "num_nodes" : 170,
-    "input_dim" : 1,
-    "rnn_units" : 64,
-    "output_dim": 1,
-    "horizon"   : OUTPUT_LEN,
-    "num_layers": 2,
-    "default_graph": True,
-    "embed_dim" : 10,
-    "cheb_k"    : 2
+    "num_nodes": 170,
+    "input_len": INPUT_LEN,
+    "input_dim": 3,
+    "embed_dim": 32,
+    "output_len": OUTPUT_LEN,
+    "num_layer": 3,
+    "if_node": True,
+    "node_dim": 32,
+    "if_T_i_D": True,
+    "if_D_i_W": True,
+    "temp_dim_tid": 32,
+    "temp_dim_diw": 32,
+    "time_of_day_size": 288,
+    "day_of_week_size": 7,
+    "ssl_name": "softclt",
+    "ssl_loss_weight": 1.0,
+    "alpha": 1.0,
+    "tau": 1.0,
+    "similarity_metric": "mse",
+    "model_name": "STID"
 }
 NUM_EPOCHS = 100
 
@@ -74,7 +90,7 @@ CFG.MODEL = EasyDict()
 CFG.MODEL.NAME = MODEL_ARCH.__name__
 CFG.MODEL.ARCH = MODEL_ARCH
 CFG.MODEL.PARAM = MODEL_PARAM
-CFG.MODEL.FORWARD_FEATURES = [0]
+CFG.MODEL.FORWARD_FEATURES = [0, 1, 2]
 CFG.MODEL.TARGET_FEATURES = [0]
 
 ############################## Metrics Configuration ##############################
@@ -85,7 +101,9 @@ CFG.METRICS.FUNCS = EasyDict({
                                 'MAE': masked_mae,
                                 'MAPE': masked_mape,
                                 'RMSE': masked_rmse,
-                            })
+                                'spatial_corr': spatial_corr,
+                                'trend_MAE': masked_trend_mae
+})
 CFG.METRICS.TARGET = 'MAE'
 CFG.METRICS.NULL_VAL = NULL_VAL
 
@@ -100,29 +118,42 @@ CFG.TRAIN.CKPT_SAVE_DIR = os.path.join(
 CFG.TRAIN.LOSS = masked_mae
 # Optimizer settings
 CFG.TRAIN.OPTIM = EasyDict()
-CFG.TRAIN.OPTIM.TYPE = 'Adam'
-CFG.TRAIN.OPTIM.PARAM = {'lr': 0.003}
+CFG.TRAIN.OPTIM.TYPE = "Adam"
+CFG.TRAIN.OPTIM.PARAM = {
+    "lr": 0.002,
+    "weight_decay": 0.0001,
+}
+# Learning rate scheduler settings
+CFG.TRAIN.LR_SCHEDULER = EasyDict()
+CFG.TRAIN.LR_SCHEDULER.TYPE = "MultiStepLR"
+CFG.TRAIN.LR_SCHEDULER.PARAM = {
+    "milestones": [1, 50, 80],
+    "gamma": 0.5
+}
+CFG.TRAIN.CLIP_GRAD_PARAM = {
+    'max_norm': 5.0
+}
 # Train data loader settings
 CFG.TRAIN.DATA = EasyDict()
-CFG.TRAIN.DATA.BATCH_SIZE = 16
+CFG.TRAIN.DATA.BATCH_SIZE = 32
 CFG.TRAIN.DATA.SHUFFLE = True
 
 ############################## Validation Configuration ##############################
 CFG.VAL = EasyDict()
 CFG.VAL.INTERVAL = 1
 CFG.VAL.DATA = EasyDict()
-CFG.VAL.DATA.BATCH_SIZE = 64
+CFG.VAL.DATA.BATCH_SIZE = 32
 
 ############################## Test Configuration ##############################
 CFG.TEST = EasyDict()
 CFG.TEST.INTERVAL = 1
 CFG.TEST.DATA = EasyDict()
-CFG.TEST.DATA.BATCH_SIZE = 64
+CFG.TEST.DATA.BATCH_SIZE = 32
 
 ############################## Evaluation Configuration ##############################
 
 CFG.EVAL = EasyDict()
 
 # Evaluation parameters
-CFG.EVAL.HORIZONS = [3, 6, 12] # Prediction horizons for evaluation. Default: []
+CFG.EVAL.HORIZONS = [i for i in range(1, 13)] # Prediction horizons for evaluation. Default: []
 CFG.EVAL.USE_GPU = True # Whether to use GPU for evaluation. Default: True

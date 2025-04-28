@@ -50,8 +50,10 @@ class SoftCLT_Loss(nn.Module):
         # (2*B*N, D)
         all_feature = torch.cat((original_feature, augmented_feature), dim=0)
         # (2*B*N, 2*B*N), 直接得到两两相似度
+        if self.normalize:
+            all_feature = F.normalize(all_feature, dim=-1)
         sim = torch.matmul(all_feature, all_feature.transpose(0, 1))
-        print("sim", sim.shape)
+        print("sim", sim.shape, torch.mean(sim), torch.max(sim))
         # (2*B*N, 2*B*N-1)
         logits = torch.tril(sim, diagonal=-1)[:, :-1]
         logits +=torch.triu(sim, diagonal=-1)[:, 1:]
@@ -135,3 +137,73 @@ class SoftCLT_Loss_Sub(SoftCLT_Loss):
         print(original_feature.shape, augmented_feature.shape)
         return SoftCLT_Loss.forward(self, original_feature, augmented_feature, original_series, augmented_series)
 
+class SoftCLTLoss_timestep(SoftCLT_Loss):
+    def forward(self,
+                original_feature: torch.Tensor,
+                augmented_feature: torch.Tensor,
+                original_series: torch.Tensor,
+                augmented_series: torch.Tensor,
+                **kwargs
+                ):
+        """
+        输入的内容包括：
+        :param original_feature: 原始输入数据的特征, 形状为(B, N, D)
+        :param augmented_feature: 数据增强后，编码的特征，形状为(B, N, D)
+        :param original_series: 输入的原始时间序列，用来计算距离，形状为(B, T, N)
+        :param augmented_series: 输入的增强时间序列(B, T, N)
+        :return softclt损失
+        """
+        # note 整理一下原始序列
+        # (b, t, n) -> (b, n, t)
+        b, t, n = original_series.shape
+        original_series = original_series.transpose(1,2).contiguous()
+        _, _, T = original_series.shape
+        original_series = original_series.reshape(-1, t)
+        augmented_series = augmented_series.reshape(b*n, t).contiguous()
+
+        # note 整理一下特征
+        batch_size, nodes, dims = original_feature.shape
+        # (B, N, D) -> (B*N, T, ts_d) -> (T, B*N, ts_d)
+        original_feature = original_feature.reshape(-1, 12, dims//12).transpose(0, 1).contiguous()
+        augmented_feature = augmented_feature.reshape(-1, 12, dims//12).transpose(0, 1).contiguous()
+
+        # note 计算两两特征之间的距离
+        # (T, 2*B*N, D)
+        all_feature = torch.cat((original_feature, augmented_feature), dim=1)
+        # (T, 2*B*N, 2*B*N), 直接得到两两相似度
+        sim = torch.matmul(all_feature, all_feature.transpose(-1, -2))
+        print("sim", sim.shape)
+        # (T, 2*B*N, 2*B*N-1)
+        logits = torch.tril(sim, diagonal=-1)[:, :, :-1]
+        logits +=torch.triu(sim, diagonal=-1)[:, :, 1:]
+
+        # note 计算两两特征之间的对比损失
+        # (T, 2*b*N, 2*B*N-1)
+        logits = -F.log_softmax(logits, dim=-1)
+
+        # note 计算两两特征之间的权重，基于输入序列
+        # (B*N, T) -> (2*B*N, T)
+        # (2B, 2B)
+        pairwise_dist = self.pairwise_dist_mse(original_series).repeat((2,2))
+        soft_label = 2 * self.alpha*F.sigmoid(-self.tau * pairwise_dist)
+        soft_label = soft_label.unsqueeze(0)
+        # 接下来去掉对角线 (2*B*N, 2*B*N-1)
+        soft_label_no_diag = torch.tril(soft_label, diagonal=-1)[:, :, :-1]
+        soft_label_no_diag += torch.triu(soft_label, diagonal=-1)[:, :, 1:]
+
+        # note 得到最终的对比损失
+        loss = logits * soft_label_no_diag
+        loss = torch.mean(loss)
+        mean_soft_label = torch.mean(soft_label)
+        print(mean_soft_label, loss)
+        return [
+            {
+                "weight": self.ssl_loss_weight,
+                "loss": loss,
+                "loss_name": self.ssl_metric_name
+            }, {
+                "weight": 0.,
+                "loss": mean_soft_label,
+                "loss_name": "mean soft label"
+            }
+        ]
