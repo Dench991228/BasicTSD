@@ -195,9 +195,11 @@ class UMixer(nn.Module):
         self.comb = nn.Linear(self.e_layers, 1)
 
     def forecast(self, x_input):
+        # note 基础处理
         x_ori = x_input.contiguous()
         x_input = self.revin(x_input, 'norm')
         x_input = self.predict_linear(x_input.permute(0, 2, 1))
+        # (b, v count_pat, model_d)
         x_input, n_vars = self.patch_embedding(x_input)
 
         x_old, _ = self.patch_embedding(x_ori.permute(0, 2, 1))

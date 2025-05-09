@@ -3,6 +3,13 @@ import numpy as np
 
 from basicts.metrics import masked_mae
 
+def double_out_loss(prediction: torch.Tensor, target: torch.Tensor, null_val, prediction_middle: torch.Tensor = None) -> torch.Tensor:
+    loss = masked_mae(prediction, target, null_val)
+    if prediction_middle is not None:
+        lloss = masked_mae(prediction_middle, target, null_val)
+        print(loss, lloss)
+        loss = (loss + lloss) / 2
+    return loss
 
 def NewDecomposeFormerLoss(prediction: torch.Tensor, target: torch.Tensor, null_val, prediction_trend: None, target_trend: None, **kwargs) -> torch.Tensor:
     """Masked mean absolute error.

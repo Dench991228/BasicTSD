@@ -5,6 +5,7 @@ from torch import nn
 
 from baselines.AGCRN.arch import AGCRN
 from baselines.DCRNN.arch import DCRNN
+from baselines.MyModel.arch.PatchFormer import PatchTSFormer_base
 from baselines.SSL.arch.ssl_factrory import ssl_factory
 from baselines.STAEformer.arch import STAEformer
 from baselines.GWNet.arch.gwnet_arch import GraphWaveNet
@@ -24,6 +25,8 @@ def model_factory(**kwargs) -> nn.Module:
         model = DCRNN(**kwargs)
     elif model_name == "STID":
         model = STID(**kwargs)
+    elif model_name == "PatchTSFormer":
+        model = PatchTSFormer_base(**kwargs)
     else:
         model = GraphWaveNet(**kwargs)
     return model

@@ -428,6 +428,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
 
         prediction, target, inputs = [], [], []
         prediction_trend, target_trend, input_trend = [], [], []
+        prediction_middle = []
         # count_batches * (B, Node, feature)
         reprs = []
         for data in tqdm(self.test_data_loader):
@@ -457,6 +458,8 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
 
             if "representation" in forward_return:
                 reprs.append(forward_return['representation'].detach().cpu())
+            if "prediction_middle" in forward_return:
+                prediction_middle.append(forward_return['prediction_middle'])
 
         prediction = torch.cat(prediction, dim=0)
         target = torch.cat(target, dim=0)
@@ -469,6 +472,11 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
             returns_all['prediction_trend'] = prediction_trend
             returns_all['target_trend'] = target_trend
             returns_all['input_trend'] = input_trend
+
+        if len(prediction_middle) > 0:
+            prediction_middle = torch.cat(prediction_middle, dim=0)
+            returns_all['prediction_middle'] = prediction_middle
+
         for key in returns_all:
             print(key, returns_all[key].shape)
         metrics_results = self.compute_evaluation_metrics(returns_all)

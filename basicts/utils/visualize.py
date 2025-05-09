@@ -37,7 +37,7 @@ def plot_line( title: str,
 
 
     # 添加标题
-    plt.title(title)
+    plt.title(title, fontsize=24)
     # 添加X轴和Y轴标签
     plt.xlabel(x_axis_name, fontsize=24)
     plt.ylabel(y_axis_name, fontsize=24)
