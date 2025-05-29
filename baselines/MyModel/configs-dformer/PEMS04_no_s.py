@@ -44,10 +44,10 @@ MODEL_PARAM = {
     "adaptive_embedding_dim": 80,
     "feed_forward_dim": 256,
     "num_heads": 4,
-    "num_layers": 3,
     "dropout": 0.1,
     "use_mixed_proj": True,
-    "kernel": 7
+    "num_t_layers": 3,
+    "num_s_layers": 0,
 }
 NUM_EPOCHS = 100
 

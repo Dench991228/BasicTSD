@@ -3,7 +3,7 @@ import sys
 import torch
 from easydict import EasyDict
 
-from baselines.MyModel.arch.DoubleFormer import STAEformer_Double
+from baselines.MyModel.arch.DoubleFormer import DynSCon
 from baselines.MyModel.loss import double_out_loss
 from basicts.metrics.trend_masked_mae import trend_masked_mae, seasonal_masked_mae, trend_only_masked_mae, \
     middle_prediction_mae
@@ -28,7 +28,7 @@ NORM_EACH_CHANNEL = regular_settings['NORM_EACH_CHANNEL'] # Whether to normalize
 RESCALE = regular_settings['RESCALE'] # Whether to rescale the data
 NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 # Model architecture and parameters
-MODEL_ARCH = STAEformer_Double
+MODEL_ARCH = DynSCon
 
 MODEL_PARAM = {
     "num_nodes" : 170,
@@ -47,7 +47,6 @@ MODEL_PARAM = {
     "num_layers": 3,
     "dropout": 0.1,
     "use_mixed_proj": True,
-    "pre_norm": True,
     "kernel": 7,
     "s_pre_norm": True,
 }

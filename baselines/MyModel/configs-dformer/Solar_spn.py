@@ -19,7 +19,7 @@ from basicts.utils import get_regular_settings, load_adj
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
-DATA_NAME = 'PEMS04'  # Dataset name
+DATA_NAME = 'Solar'  # Dataset name
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # Length of input sequence
 OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # Length of output sequence
@@ -31,15 +31,15 @@ NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 MODEL_ARCH = DynSCon
 
 MODEL_PARAM = {
-    "num_nodes" : 307,
+    "num_nodes" : 137,
     "in_steps": INPUT_LEN,
     "out_steps": OUTPUT_LEN,
-    "steps_per_day": 288, # number of time steps per day
-    "input_dim": 3, # the C in [B, L, N, C]
+    "steps_per_day": 144, # number of time steps per day
+    "input_dim": 2, # the C in [B, L, N, C]
     "output_dim": 1,
     "input_embedding_dim": 24,
     "tod_embedding_dim": 24,
-    "dow_embedding_dim": 24,
+    "dow_embedding_dim": 0,
     "spatial_embedding_dim": 0,
     "adaptive_embedding_dim": 80,
     "feed_forward_dim": 256,
@@ -47,7 +47,7 @@ MODEL_PARAM = {
     "num_layers": 3,
     "dropout": 0.1,
     "use_mixed_proj": True,
-    "kernel": 7
+    "s_pre_norm": True,
 }
 NUM_EPOCHS = 100
 
@@ -89,7 +89,7 @@ CFG.MODEL = EasyDict()
 CFG.MODEL.NAME = MODEL_ARCH.__name__
 CFG.MODEL.ARCH = MODEL_ARCH
 CFG.MODEL.PARAM = MODEL_PARAM
-CFG.MODEL.FORWARD_FEATURES = [0, 1, 2]
+CFG.MODEL.FORWARD_FEATURES = [0, 1]
 CFG.MODEL.TARGET_FEATURES = [0]
 
 ############################## Metrics Configuration ##############################
@@ -125,7 +125,7 @@ CFG.TRAIN.OPTIM.PARAM = {
 CFG.TRAIN.LR_SCHEDULER = EasyDict()
 CFG.TRAIN.LR_SCHEDULER.TYPE = "MultiStepLR"
 CFG.TRAIN.LR_SCHEDULER.PARAM = {
-    "milestones": [30, 50],
+    "milestones": [25, 45, 65],
     "gamma": 0.1
 }
 # Train data loader settings

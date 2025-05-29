@@ -123,13 +123,9 @@ class SelfAttentionLayer(nn.Module):
         return x
 
 
-class STAEformer_Double(nn.Module):
+class DynSCon(nn.Module):
     """
-    Paper: STAEformer: Spatio-Temporal Adaptive Embedding Makes Vanilla Transformer SOTA for Traffic Forecasting
-    Link: https://arxiv.org/abs/2308.10425
-    Official Code: https://github.com/XDZhelheim/STAEformer
-    Venue: CIKM 2023
-    Task: Spatial-Temporal Forecasting
+    基于STAEformer和对比学习技术的一个方法
     """
     def __init__(
         self,
@@ -148,7 +144,6 @@ class STAEformer_Double(nn.Module):
         num_heads=4,
         num_layers=None,
         dropout=0.1,
-        use_mixed_proj=True,
         num_t_layers=None,
         num_s_layers=None,
         pre_norm=False,
@@ -177,7 +172,6 @@ class STAEformer_Double(nn.Module):
         )
         self.num_heads = num_heads
         self.num_layers = num_layers
-        self.use_mixed_proj = use_mixed_proj
         # note 嵌入的部分
         self.input_proj = nn.Linear(input_dim, input_embedding_dim)
         if tod_embedding_dim > 0:
@@ -198,14 +192,10 @@ class STAEformer_Double(nn.Module):
                 nn.Parameter(torch.empty(in_steps, num_nodes, adaptive_embedding_dim))
             )
         # note 回归头
-        if use_mixed_proj:
-            self.output_proj = nn.Linear(
-                in_steps * self.model_dim, out_steps * output_dim
-            )
-            self.output_proj_middle = nn.Linear(in_steps * self.model_dim, out_steps * output_dim)
-        else:
-            self.temporal_proj = nn.Linear(in_steps, out_steps)
-            self.output_proj = nn.Linear(self.model_dim, self.output_dim)
+        self.output_proj = nn.Linear(
+            in_steps * self.model_dim, out_steps * output_dim
+        )
+        self.output_proj_middle = nn.Linear(in_steps * self.model_dim, out_steps * output_dim)
 
         self.attn_layers_t = nn.ModuleList(
             [
@@ -277,23 +267,14 @@ class STAEformer_Double(nn.Module):
         repr = x.transpose(1, 2)
         repr = repr.reshape(batch_size, -1, self.model_dim * self.in_steps)
         # print(repr.shape)
-        if self.use_mixed_proj:
-            out = x.transpose(1, 2)  # (batch_size, num_nodes, in_steps, model_dim)
-            out = out.reshape(
-                batch_size, self.num_nodes, self.in_steps * self.model_dim
-            )
-            out = self.output_proj(out).view(
-                batch_size, self.num_nodes, self.out_steps, self.output_dim
-            )
-            out = out.transpose(1, 2)  # (batch_size, out_steps, num_nodes, output_dim)
-        else:
-            out = x.transpose(1, 3)  # (batch_size, model_dim, num_nodes, in_steps)
-            out = self.temporal_proj(
-                out
-            )  # (batch_size, model_dim, num_nodes, out_steps)
-            out = self.output_proj(
-                out.transpose(1, 3)
-            )  # (batch_size, out_steps, num_nodes, output_dim)
+        out = x.transpose(1, 2)  # (batch_size, num_nodes, in_steps, model_dim)
+        out = out.reshape(
+            batch_size, self.num_nodes, self.in_steps * self.model_dim
+        )
+        out = self.output_proj(out).view(
+            batch_size, self.num_nodes, self.out_steps, self.output_dim
+        )
+        out = out.transpose(1, 2)  # (batch_size, out_steps, num_nodes, output_dim)
         if not return_repr:
             return {
                 "prediction": out,
@@ -315,3 +296,35 @@ class STAEformer_Double(nn.Module):
         spatial_embeddings = spatial_embeddings.transpose(0, 1).contiguous()
         spatial_embeddings = spatial_embeddings.reshape(self.num_nodes, -1)
         return spatial_embeddings
+
+    @staticmethod
+    def get_dynamic_graph(representations: torch.Tensor, tau: float = 1.0):
+        """
+        :param representations: 形如(bs, nodes, d)的张量
+        :param tau: 温度，用来控制分布的
+        :return (bs, nodes, nodes)
+        """
+        return torch.softmax(torch.bmm(representations, torch.transpose(representations, -1, -2)) / tau, dim=-1)
+
+    @staticmethod
+    def get_ego_graph_repr(representations: torch.Tensor, graph: torch.Tensor):
+        """
+        :param representations: 输入的特征，规整为(bs, nodes, d)
+        :param graph: 上面构建的图，形状为(bs, nodes, nodes)
+        :return (bs, nodes, d)
+        note 后续这里可以调整为top-λ这种
+        """
+        return torch.bmm(graph, representations)
+
+    @staticmethod
+    def get_soft_labels(representations: torch.Tensor, use_aug: bool = True):
+        """
+        这一步的目的，是根据模型的输入特征，分别得到时序和空间的软标签
+        :param representations: 输入特征，如果use_aug=False那就是 (bs, nodes, d)；否则就是(2bs, nodes, d)
+        :param use_aug: 是否采用了数据增强
+        :return (nodes, bs, bs), (bs, nodes, nodes)
+        """
+        with torch.no_grad():
+            original_reprs = representations if not use_aug else representations[:representations.shape[0]//2]
+            # 基于original_reprs计算软标签，如果有数据增强，再扩展一下这个标签
+            

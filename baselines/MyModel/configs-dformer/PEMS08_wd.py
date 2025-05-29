@@ -19,7 +19,7 @@ from basicts.utils import get_regular_settings, load_adj
 
 ############################## Hot Parameters ##############################
 # Dataset & Metrics configuration
-DATA_NAME = 'PEMS04'  # Dataset name
+DATA_NAME = 'PEMS08'  # Dataset name
 regular_settings = get_regular_settings(DATA_NAME)
 INPUT_LEN = regular_settings['INPUT_LEN']  # Length of input sequence
 OUTPUT_LEN = regular_settings['OUTPUT_LEN']  # Length of output sequence
@@ -31,7 +31,7 @@ NULL_VAL = regular_settings['NULL_VAL'] # Null value in the data
 MODEL_ARCH = DynSCon
 
 MODEL_PARAM = {
-    "num_nodes" : 307,
+    "num_nodes" : 170,
     "in_steps": INPUT_LEN,
     "out_steps": OUTPUT_LEN,
     "steps_per_day": 288, # number of time steps per day
@@ -119,13 +119,13 @@ CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"
 CFG.TRAIN.OPTIM.PARAM = {
     "lr": 0.001,
-    "weight_decay": 0.0003,
+    "weight_decay": 0.0015,
 }
 # Learning rate scheduler settings
 CFG.TRAIN.LR_SCHEDULER = EasyDict()
 CFG.TRAIN.LR_SCHEDULER.TYPE = "MultiStepLR"
 CFG.TRAIN.LR_SCHEDULER.PARAM = {
-    "milestones": [30, 50],
+    "milestones": [25, 45, 80],
     "gamma": 0.1
 }
 # Train data loader settings

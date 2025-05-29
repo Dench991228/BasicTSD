@@ -62,3 +62,15 @@ def DualDecomposeFormerLoss(prediction: torch.Tensor, target: torch.Tensor, null
     loss /= scale
     # print(loss)
     return loss
+
+class DoubleLoss:
+    def __init__(self, prediction_middle_weight=1.0):
+        self.prediction_middle_weight = prediction_middle_weight
+
+    def __call__(self, prediction: torch.Tensor, target: torch.Tensor, null_val, prediction_middle: torch.Tensor = None):
+        loss = masked_mae(prediction, target, null_val)
+        if prediction_middle is not None:
+            lloss = masked_mae(prediction_middle, target, null_val) * self.prediction_middle_weight
+            print(loss, lloss)
+            loss = (loss + lloss) / (1+self.prediction_middle_weight)
+        return loss
