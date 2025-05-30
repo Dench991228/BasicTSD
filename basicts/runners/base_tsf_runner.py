@@ -350,7 +350,7 @@ class BaseTimeSeriesForecastingRunner(BaseEpochRunner):
         if "other_losses" in forward_return:
             for loss_item in forward_return['other_losses']:
                 loss += loss_item['loss'] * loss_item['weight']
-                print(loss, loss_item['weight'] * loss_item['loss'])
+                print(loss, loss_item['weight'] * loss_item['loss'], loss_item["loss_name"])
                 ln = loss_item['loss_name']
                 if f"train/{ln}" not in self.meter_pool._pool:
                     self.register_epoch_meter(f"train/{ln}", "train")

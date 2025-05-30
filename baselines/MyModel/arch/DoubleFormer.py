@@ -2,6 +2,9 @@ from typing import Dict
 
 import torch.nn as nn
 import torch
+import torch.nn.functional as F
+
+from baselines.SSL.arch.PatchPerm import PatchPermAugmentation
 
 
 class AttentionLayer(nn.Module):
@@ -123,7 +126,7 @@ class SelfAttentionLayer(nn.Module):
         return x
 
 
-class DynSCon(nn.Module):
+class DynSCon_Base(nn.Module):
     """
     基于STAEformer和对比学习技术的一个方法
     """
@@ -284,6 +287,7 @@ class DynSCon(nn.Module):
             return {
                 "prediction": out,
                 "representation": repr,
+                "temporal_representation": repr_middle,
                 "prediction_middle": output_middle,
             }
 
@@ -296,6 +300,41 @@ class DynSCon(nn.Module):
         spatial_embeddings = spatial_embeddings.transpose(0, 1).contiguous()
         spatial_embeddings = spatial_embeddings.reshape(self.num_nodes, -1)
         return spatial_embeddings
+
+
+class DynSCon(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.base_model = DynSCon_Base(**kwargs)
+        self.spatial_label_tau = kwargs["spatial_label_tau"]
+        self.temporal_label_tau = kwargs["temporal_label_tau"]
+        self.dynamic_graph_tau = kwargs["dynamic_graph_tau"]
+        self.spatial_loss_weight = kwargs["spatial_loss_weight"]
+        self.temporal_loss_weight = kwargs["temporal_loss_weight"]
+        self.ppa_aug = PatchPermAugmentation()
+
+
+    def forward(self, history_data: torch.Tensor, future_data: torch.Tensor,
+                batch_seen: int, epoch: int, train: bool,
+                return_repr: bool = False, **kwargs):
+        # note 如果没有对比损失的话
+        # prediction: 预测结果，repr (B, node, dim)
+        original_forward_output = self.base_model(history_data, future_data, batch_seen, epoch, train, True)
+
+        # note 先数据增强, 先交换，再增加高斯噪声
+        augmented_data = self.ppa_aug(history_data)
+        rand_noise = torch.randn_like(augmented_data[:, :, :, 0]).cuda()*0.01
+        augmented_data[:, :, :, 0] += rand_noise
+        augmented_forward_output = self.base_model(augmented_data, future_data, batch_seen, epoch, train, True)
+
+        # note 之后再收集对比学习部分的损失
+        all_representation = torch.cat([original_forward_output['representation'], augmented_forward_output['representation']], dim=0)
+        all_temporal_representation = torch.cat([original_forward_output['temporal_representation'], augmented_forward_output['temporal_representation']], dim=0)
+        ssl_loss = self.compute_contrastive_loss(all_temporal_representation, all_representation)
+        original_forward_output['other_losses'] = ssl_loss
+        if not return_repr:
+            del original_forward_output['representation']
+        return original_forward_output
 
     @staticmethod
     def get_dynamic_graph(representations: torch.Tensor, tau: float = 1.0):
@@ -316,8 +355,7 @@ class DynSCon(nn.Module):
         """
         return torch.bmm(graph, representations)
 
-    @staticmethod
-    def get_soft_labels(representations: torch.Tensor, use_aug: bool = True):
+    def get_distance(self, representations: torch.Tensor, use_aug: bool = True):
         """
         这一步的目的，是根据模型的输入特征，分别得到时序和空间的软标签
         :param representations: 输入特征，如果use_aug=False那就是 (bs, nodes, d)；否则就是(2bs, nodes, d)
@@ -326,5 +364,81 @@ class DynSCon(nn.Module):
         """
         with torch.no_grad():
             original_reprs = representations if not use_aug else representations[:representations.shape[0]//2]
+
             # 基于original_reprs计算软标签，如果有数据增强，再扩展一下这个标签
-            
+            dynamic_graph = DynSCon.get_dynamic_graph(original_reprs, self.dynamic_graph_tau)
+            # (bs, nodes, d)
+            ego_graph_representations = DynSCon.get_ego_graph_repr(original_reprs, dynamic_graph)
+            # (nodes, bs, d)
+            ego_graph_representations_transposed = ego_graph_representations.transpose(0, 1).contiguous()
+            # (nodes, bs, bs)
+            pairwise_dist_temporal = DynSCon.pairwise_dist_mse(ego_graph_representations_transposed)
+            # (bs, nodes, nodes)
+            pairwise_dist_spatial = DynSCon.pairwise_dist_mse(ego_graph_representations)
+            # note 如果涉及到数据增强（大概率会），就扩展一下
+            if use_aug:
+                pairwise_dist_temporal = pairwise_dist_temporal.repeat(1, 2, 2)
+                pairwise_dist_spatial = pairwise_dist_spatial.repeat(1, 2, 2)
+            return pairwise_dist_temporal, pairwise_dist_spatial
+
+    @staticmethod
+    def pairwise_dist_mse(all_features: torch.Tensor):
+        """
+        计算两两之间的软标签
+        note 直接依靠原始序列进行计算，计算完了之后得到(B, B)的相似度矩阵，之后再进行
+        :param all_features: 包含Batch个样本，其中每一个样本有d维的张量，计算两两之间的相似性
+        :return 形状为(B, B)的矩阵，代表了两两之间的mse
+        """
+        # (*, B, d) -> (*, B), 每一行是这一列的全部平方和
+        sum_sq = all_features.pow(2).sum(dim=-1)
+        # (*, B, d) * (*, d, B) 每一行都是两个向量对位相乘之和 (*, B, B)
+        dot_product = torch.matmul(all_features, all_features.transpose(-1, -2))
+        # (*, B, 1) + (*, 1, B) - 2*(*, B, B)
+        mse_matrix = (sum_sq.unsqueeze(-1) + sum_sq.unsqueeze(-2) - 2 * dot_product)
+        return mse_matrix
+
+    def compute_contrastive_loss(self, temporal_representations: torch.Tensor,
+                                 final_representations: torch.Tensor):
+        """
+        计算最终的软对比损失
+        :param temporal_representations: 时序层的输出，对比学习的目标 (bs, nodes, d)
+        :param final_representations: 最后一层的输出，对比学习的最终目标
+        :return 返回两个损失函数
+        """
+        # note 得到两两之间的距离
+        pairwise_dist_temporal, pairwise_dist_spatial = self.get_distance(temporal_representations)
+        print(torch.mean(pairwise_dist_temporal))
+        # note 得到两两之间的软标签
+        temporal_soft_labels = 2 * F.sigmoid(-self.temporal_label_tau * pairwise_dist_temporal)
+        temporal_soft_labels_no_diag = torch.tril(temporal_soft_labels, diagonal=-1)[:, :, :-1]
+        temporal_soft_labels_no_diag += torch.triu(temporal_soft_labels, diagonal=-1)[:, :, 1:]
+
+        spatial_soft_labels = 2 * F.sigmoid(-self.spatial_label_tau * pairwise_dist_spatial)
+
+        # note 开始计算时序部分的logit
+        # (nodes, bs, d) @ (nodes, d, bs) -> (nodes, bs, bs)
+        temporal_sim = torch.matmul(final_representations.transpose(0, 1),
+                                    final_representations.permute(1, 2, 0))
+        # print("sim", temporal_sim.shape, torch.mean(temporal_sim), torch.max(temporal_sim))
+        # (nodes, bs, bs-1)
+        temporal_logits = torch.tril(temporal_sim, diagonal=-1)[:, :, :-1]
+        temporal_logits +=torch.triu(temporal_sim, diagonal=-1)[:, :, 1:]
+
+        # note 计算两两特征之间的对比损失
+        # (nodes, bs, bs-1)
+        temporal_logits = -F.log_softmax(temporal_logits, dim=-1)
+
+        loss = temporal_logits * temporal_soft_labels_no_diag
+        loss = torch.mean(loss)
+        mean_soft_label = torch.mean(temporal_soft_labels)
+        return [
+            {
+                "weight": self.temporal_loss_weight,
+                "loss": loss,
+                "loss_name": "temporal_loss",
+            }, {
+                "weight": 0.,
+                "loss": mean_soft_label,
+                "loss_name": "mean soft label"
+            }
+        ]
